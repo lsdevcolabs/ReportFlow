@@ -46,6 +46,8 @@ function getAppBaseUrl(): string {
   return process.env.APP_URL ?? "http://localhost:80";
 }
 
+const isDemoMode = () => !process.env.LEMONSQUEEZY_API_KEY;
+
 // POST /api/billing/checkout
 router.post("/billing/checkout", requireAuth, async (req: any, res): Promise<void> => {
   const { plan } = req.body as { plan?: string };
@@ -54,6 +56,27 @@ router.post("/billing/checkout", requireAuth, async (req: any, res): Promise<voi
     res.status(400).json({ error: "plan must be 'starter' or 'pro'" });
     return;
   }
+
+  // ── DEMO MODE ──────────────────────────────────────────────────────────────
+  // When no Lemon Squeezy credentials are configured, simulate a successful
+  // payment by saving the plan directly and returning an internal redirect URL.
+  if (isDemoMode()) {
+    try {
+      await db
+        .insert(userProfilesTable)
+        .values({ userId: req.userId, plan, onboardingComplete: true })
+        .onConflictDoUpdate({
+          target: userProfilesTable.userId,
+          set: { plan, onboardingComplete: true },
+        });
+      res.json({ checkoutUrl: "/dashboard" });
+    } catch (err) {
+      req.log.error({ err }, "Demo mode checkout error");
+      res.status(500).json({ error: "Internal server error" });
+    }
+    return;
+  }
+  // ── END DEMO MODE ──────────────────────────────────────────────────────────
 
   const variantId = getVariantIdForPlan(plan);
   if (!variantId) {

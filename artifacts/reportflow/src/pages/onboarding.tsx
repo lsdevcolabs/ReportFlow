@@ -78,12 +78,12 @@ export default function Onboarding() {
     }
 
     if (selected === "free") {
-      // Free plan: save profile immediately and go to dashboard
       saveProfile.mutate(
         { data: { plan: "free" } },
         {
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: getGetUserProfileQueryKey() });
+          onSuccess: (savedProfile) => {
+            // Write directly into cache so OnboardingCheck sees onboardingComplete:true immediately
+            queryClient.setQueryData(getGetUserProfileQueryKey(), savedProfile);
             setLocation("/dashboard");
           },
           onError: () => {
@@ -92,12 +92,19 @@ export default function Onboarding() {
         },
       );
     } else {
-      // Paid plan: create Lemon Squeezy checkout and redirect
+      // Paid plan: go to Lemon Squeezy checkout (or /dashboard in demo mode)
       createCheckout.mutate(
         { data: { plan: selected } },
         {
-          onSuccess: ({ checkoutUrl }) => {
-            window.location.href = checkoutUrl;
+          onSuccess: async ({ checkoutUrl }) => {
+            // Demo mode returns /dashboard; real LS returns an external URL
+            if (checkoutUrl.startsWith("/") || checkoutUrl.startsWith(window.location.origin)) {
+              // Refetch and wait so OnboardingCheck sees onboardingComplete:true before we navigate
+              await queryClient.refetchQueries({ queryKey: getGetUserProfileQueryKey() });
+              setLocation("/dashboard");
+            } else {
+              window.location.href = checkoutUrl;
+            }
           },
           onError: () => {
             toast({
