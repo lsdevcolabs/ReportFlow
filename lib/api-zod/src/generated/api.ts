@@ -8,6 +8,51 @@
 import * as zod from "zod";
 
 /**
+ * @summary Create a Lemon Squeezy checkout URL for a paid plan
+ */
+export const CreateBillingCheckoutBody = zod.object({
+  plan: zod.enum(["starter", "pro"]),
+});
+
+export const CreateBillingCheckoutResponse = zod.object({
+  checkoutUrl: zod.string(),
+});
+
+/**
+ * @summary Get the Lemon Squeezy customer portal URL
+ */
+export const GetBillingPortalResponse = zod.object({
+  portalUrl: zod.string(),
+});
+
+/**
+ * @summary Get the current user's active subscription
+ */
+export const GetBillingSubscriptionResponse = zod.object({
+  id: zod.number(),
+  userId: zod.string(),
+  lsSubscriptionId: zod.string(),
+  lsCustomerId: zod.string(),
+  lsVariantId: zod.string(),
+  lsOrderId: zod.string().nullish(),
+  plan: zod.enum(["starter", "pro"]),
+  status: zod.enum([
+    "active",
+    "on_trial",
+    "paused",
+    "cancelled",
+    "expired",
+    "past_due",
+    "unpaid",
+  ]),
+  renewsAt: zod.coerce.date().nullish(),
+  endsAt: zod.coerce.date().nullish(),
+  trialEndsAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Get the current user's profile
  */
 export const GetUserProfileResponse = zod.object({

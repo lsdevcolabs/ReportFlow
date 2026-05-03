@@ -4,6 +4,7 @@ import clientsRouter from "./clients";
 import reportsRouter from "./reports";
 import metricsRouter from "./metrics";
 import userRouter from "./user";
+import billingRouter from "./billing";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(clientsRouter);
 router.use(reportsRouter);
 router.use(metricsRouter);
 router.use(userRouter);
+router.use(billingRouter);
 
 export default router;

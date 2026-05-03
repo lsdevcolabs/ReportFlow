@@ -17,6 +17,9 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  BillingCheckoutBody,
+  BillingCheckoutResponse,
+  BillingPortalResponse,
   Client,
   CreateClientBody,
   CreateReportBody,
@@ -25,6 +28,7 @@ import type {
   ListReportsParams,
   Report,
   SaveUserProfileBody,
+  Subscription,
   TimeSeriesPoint,
   UpdateClientBody,
   UpdateReportBody,
@@ -39,6 +43,243 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary Create a Lemon Squeezy checkout URL for a paid plan
+ */
+export const getCreateBillingCheckoutUrl = () => {
+  return `/api/billing/checkout`;
+};
+
+export const createBillingCheckout = async (
+  billingCheckoutBody: BillingCheckoutBody,
+  options?: RequestInit,
+): Promise<BillingCheckoutResponse> => {
+  return customFetch<BillingCheckoutResponse>(getCreateBillingCheckoutUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(billingCheckoutBody),
+  });
+};
+
+export const getCreateBillingCheckoutMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBillingCheckout>>,
+    TError,
+    { data: BodyType<BillingCheckoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBillingCheckout>>,
+  TError,
+  { data: BodyType<BillingCheckoutBody> },
+  TContext
+> => {
+  const mutationKey = ["createBillingCheckout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBillingCheckout>>,
+    { data: BodyType<BillingCheckoutBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createBillingCheckout(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateBillingCheckoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createBillingCheckout>>
+>;
+export type CreateBillingCheckoutMutationBody = BodyType<BillingCheckoutBody>;
+export type CreateBillingCheckoutMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a Lemon Squeezy checkout URL for a paid plan
+ */
+export const useCreateBillingCheckout = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBillingCheckout>>,
+    TError,
+    { data: BodyType<BillingCheckoutBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBillingCheckout>>,
+  TError,
+  { data: BodyType<BillingCheckoutBody> },
+  TContext
+> => {
+  return useMutation(getCreateBillingCheckoutMutationOptions(options));
+};
+
+/**
+ * @summary Get the Lemon Squeezy customer portal URL
+ */
+export const getGetBillingPortalUrl = () => {
+  return `/api/billing/portal`;
+};
+
+export const getBillingPortal = async (
+  options?: RequestInit,
+): Promise<BillingPortalResponse> => {
+  return customFetch<BillingPortalResponse>(getGetBillingPortalUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBillingPortalQueryKey = () => {
+  return [`/api/billing/portal`] as const;
+};
+
+export const getGetBillingPortalQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBillingPortal>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBillingPortal>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBillingPortalQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBillingPortal>>
+  > = ({ signal }) => getBillingPortal({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBillingPortal>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBillingPortalQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBillingPortal>>
+>;
+export type GetBillingPortalQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the Lemon Squeezy customer portal URL
+ */
+
+export function useGetBillingPortal<
+  TData = Awaited<ReturnType<typeof getBillingPortal>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBillingPortal>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBillingPortalQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the current user's active subscription
+ */
+export const getGetBillingSubscriptionUrl = () => {
+  return `/api/billing/subscription`;
+};
+
+export const getBillingSubscription = async (
+  options?: RequestInit,
+): Promise<Subscription> => {
+  return customFetch<Subscription>(getGetBillingSubscriptionUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBillingSubscriptionQueryKey = () => {
+  return [`/api/billing/subscription`] as const;
+};
+
+export const getGetBillingSubscriptionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBillingSubscription>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBillingSubscription>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetBillingSubscriptionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBillingSubscription>>
+  > = ({ signal }) => getBillingSubscription({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBillingSubscription>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBillingSubscriptionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBillingSubscription>>
+>;
+export type GetBillingSubscriptionQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current user's active subscription
+ */
+
+export function useGetBillingSubscription<
+  TData = Awaited<ReturnType<typeof getBillingSubscription>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBillingSubscription>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBillingSubscriptionQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get the current user's profile

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useSaveUserProfile, getGetUserProfileQueryKey } from "@workspace/api-client-react";
+import {
+  useSaveUserProfile,
+  useCreateBillingCheckout,
+  getGetUserProfileQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Check, Zap, Loader2, ArrowRight } from "lucide-react";
-
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const plans = [
   {
@@ -65,6 +67,9 @@ export default function Onboarding() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const saveProfile = useSaveUserProfile();
+  const createCheckout = useCreateBillingCheckout();
+
+  const isPending = saveProfile.isPending || createCheckout.isPending;
 
   const handleContinue = () => {
     if (!selected) {
@@ -72,18 +77,37 @@ export default function Onboarding() {
       return;
     }
 
-    saveProfile.mutate(
-      { data: { plan: selected } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetUserProfileQueryKey() });
-          setLocation("/dashboard");
+    if (selected === "free") {
+      // Free plan: save profile immediately and go to dashboard
+      saveProfile.mutate(
+        { data: { plan: "free" } },
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: getGetUserProfileQueryKey() });
+            setLocation("/dashboard");
+          },
+          onError: () => {
+            toast({ title: "Something went wrong. Please try again.", variant: "destructive" });
+          },
         },
-        onError: () => {
-          toast({ title: "Something went wrong. Please try again.", variant: "destructive" });
+      );
+    } else {
+      // Paid plan: create Lemon Squeezy checkout and redirect
+      createCheckout.mutate(
+        { data: { plan: selected } },
+        {
+          onSuccess: ({ checkoutUrl }) => {
+            window.location.href = checkoutUrl;
+          },
+          onError: () => {
+            toast({
+              title: "Could not start checkout. Please try again.",
+              variant: "destructive",
+            });
+          },
         },
-      },
-    );
+      );
+    }
   };
 
   return (
@@ -131,7 +155,6 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Selected checkmark */}
               <div
                 className={`absolute top-4 right-4 h-6 w-6 rounded-full flex items-center justify-center transition-all ${
                   isSelected
@@ -159,6 +182,12 @@ export default function Onboarding() {
                   </li>
                 ))}
               </ul>
+
+              {plan.id !== "free" && (
+                <p className="text-xs text-muted-foreground">
+                  You'll be taken to a secure checkout
+                </p>
+              )}
             </button>
           );
         })}
@@ -170,19 +199,24 @@ export default function Onboarding() {
           size="lg"
           className="px-10 text-base gap-2"
           onClick={handleContinue}
-          disabled={!selected || saveProfile.isPending}
+          disabled={!selected || isPending}
         >
-          {saveProfile.isPending ? (
+          {isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
-              Continue with {selected ? plans.find((p) => p.id === selected)?.name : "…"}
+              {selected === "free" ? "Start for free" : selected ? `Subscribe to ${plans.find((p) => p.id === selected)?.name}` : "Select a plan"}
               <ArrowRight className="h-4 w-4" />
             </>
           )}
         </Button>
         {!selected && (
           <p className="text-sm text-muted-foreground">Select a plan above to continue</p>
+        )}
+        {selected !== "free" && selected && (
+          <p className="text-xs text-muted-foreground">
+            Secure payment via Lemon Squeezy · Cancel anytime
+          </p>
         )}
       </div>
     </div>

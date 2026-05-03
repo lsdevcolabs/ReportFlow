@@ -121,6 +121,63 @@ export interface UserProfile {
   createdAt: string;
 }
 
+export type BillingCheckoutBodyPlan =
+  (typeof BillingCheckoutBodyPlan)[keyof typeof BillingCheckoutBodyPlan];
+
+export const BillingCheckoutBodyPlan = {
+  starter: "starter",
+  pro: "pro",
+} as const;
+
+export interface BillingCheckoutBody {
+  plan: BillingCheckoutBodyPlan;
+}
+
+export interface BillingCheckoutResponse {
+  checkoutUrl: string;
+}
+
+export interface BillingPortalResponse {
+  portalUrl: string;
+}
+
+export type SubscriptionPlan =
+  (typeof SubscriptionPlan)[keyof typeof SubscriptionPlan];
+
+export const SubscriptionPlan = {
+  starter: "starter",
+  pro: "pro",
+} as const;
+
+export type SubscriptionStatus =
+  (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus];
+
+export const SubscriptionStatus = {
+  active: "active",
+  on_trial: "on_trial",
+  paused: "paused",
+  cancelled: "cancelled",
+  expired: "expired",
+  past_due: "past_due",
+  unpaid: "unpaid",
+} as const;
+
+export interface Subscription {
+  id: number;
+  userId: string;
+  lsSubscriptionId: string;
+  lsCustomerId: string;
+  lsVariantId: string;
+  lsOrderId?: string | null;
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  renewsAt?: string | null;
+  endsAt?: string | null;
+  trialEndsAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SaveUserProfileBodyPlan =
   (typeof SaveUserProfileBodyPlan)[keyof typeof SaveUserProfileBodyPlan];
 

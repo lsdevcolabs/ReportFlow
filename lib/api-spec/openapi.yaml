@@ -18,8 +18,55 @@ tags:
     description: Dashboard metrics and analytics
   - name: user
     description: User profile and onboarding
+  - name: billing
+    description: Subscription billing via Lemon Squeezy
 
 paths:
+  /billing/checkout:
+    post:
+      operationId: createBillingCheckout
+      tags: [billing]
+      summary: Create a Lemon Squeezy checkout URL for a paid plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingCheckoutBody"
+      responses:
+        "200":
+          description: Checkout URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingCheckoutResponse"
+
+  /billing/portal:
+    get:
+      operationId: getBillingPortal
+      tags: [billing]
+      summary: Get the Lemon Squeezy customer portal URL
+      responses:
+        "200":
+          description: Portal URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingPortalResponse"
+
+  /billing/subscription:
+    get:
+      operationId: getBillingSubscription
+      tags: [billing]
+      summary: Get the current user's active subscription
+      responses:
+        "200":
+          description: Subscription or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+
   /user/profile:
     get:
       operationId: getUserProfile
@@ -573,6 +620,82 @@ components:
         - plan
         - onboardingComplete
         - createdAt
+
+    BillingCheckoutBody:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [starter, pro]
+      required:
+        - plan
+
+    BillingCheckoutResponse:
+      type: object
+      properties:
+        checkoutUrl:
+          type: string
+      required:
+        - checkoutUrl
+
+    BillingPortalResponse:
+      type: object
+      properties:
+        portalUrl:
+          type: string
+      required:
+        - portalUrl
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        lsSubscriptionId:
+          type: string
+        lsCustomerId:
+          type: string
+        lsVariantId:
+          type: string
+        lsOrderId:
+          type: string
+          nullable: true
+        plan:
+          type: string
+          enum: [starter, pro]
+        status:
+          type: string
+          enum: [active, on_trial, paused, cancelled, expired, past_due, unpaid]
+        renewsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        trialEndsAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - lsSubscriptionId
+        - lsCustomerId
+        - lsVariantId
+        - plan
+        - status
+        - createdAt
+        - updatedAt
 
     SaveUserProfileBody:
       type: object
