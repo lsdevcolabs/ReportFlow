@@ -9,12 +9,15 @@ const router = Router();
 function requireAuth(req: any, res: any, next: any) {
   const auth = getAuth(req);
   const userId = auth?.sessionClaims?.userId || auth?.userId;
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   req.userId = userId;
   next();
 }
 
-router.get("/clients", requireAuth, async (req: any, res) => {
+router.get("/clients", requireAuth, async (req: any, res): Promise<void> => {
   try {
     const clients = await db
       .select({
@@ -39,9 +42,12 @@ router.get("/clients", requireAuth, async (req: any, res) => {
   }
 });
 
-router.post("/clients", requireAuth, async (req: any, res) => {
+router.post("/clients", requireAuth, async (req: any, res): Promise<void> => {
   const parsed = CreateClientBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
 
   try {
     const [client] = await db
@@ -55,9 +61,12 @@ router.post("/clients", requireAuth, async (req: any, res) => {
   }
 });
 
-router.get("/clients/:clientId", requireAuth, async (req: any, res) => {
+router.get("/clients/:clientId", requireAuth, async (req: any, res): Promise<void> => {
   const clientId = parseInt(req.params.clientId);
-  if (isNaN(clientId)) return res.status(400).json({ error: "Invalid clientId" });
+  if (isNaN(clientId)) {
+    res.status(400).json({ error: "Invalid clientId" });
+    return;
+  }
 
   try {
     const [client] = await db
@@ -77,7 +86,10 @@ router.get("/clients/:clientId", requireAuth, async (req: any, res) => {
       .from(clientsTable)
       .where(and(eq(clientsTable.id, clientId), eq(clientsTable.userId, req.userId)));
 
-    if (!client) return res.status(404).json({ error: "Client not found" });
+    if (!client) {
+      res.status(404).json({ error: "Client not found" });
+      return;
+    }
     res.json(client);
   } catch (err) {
     req.log.error({ err }, "Failed to get client");
@@ -85,12 +97,18 @@ router.get("/clients/:clientId", requireAuth, async (req: any, res) => {
   }
 });
 
-router.put("/clients/:clientId", requireAuth, async (req: any, res) => {
+router.put("/clients/:clientId", requireAuth, async (req: any, res): Promise<void> => {
   const clientId = parseInt(req.params.clientId);
-  if (isNaN(clientId)) return res.status(400).json({ error: "Invalid clientId" });
+  if (isNaN(clientId)) {
+    res.status(400).json({ error: "Invalid clientId" });
+    return;
+  }
 
   const parsed = UpdateClientBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
 
   try {
     const [client] = await db
@@ -99,7 +117,10 @@ router.put("/clients/:clientId", requireAuth, async (req: any, res) => {
       .where(and(eq(clientsTable.id, clientId), eq(clientsTable.userId, req.userId)))
       .returning();
 
-    if (!client) return res.status(404).json({ error: "Client not found" });
+    if (!client) {
+      res.status(404).json({ error: "Client not found" });
+      return;
+    }
     res.json({ ...client, reportCount: 0 });
   } catch (err) {
     req.log.error({ err }, "Failed to update client");
@@ -107,9 +128,12 @@ router.put("/clients/:clientId", requireAuth, async (req: any, res) => {
   }
 });
 
-router.delete("/clients/:clientId", requireAuth, async (req: any, res) => {
+router.delete("/clients/:clientId", requireAuth, async (req: any, res): Promise<void> => {
   const clientId = parseInt(req.params.clientId);
-  if (isNaN(clientId)) return res.status(400).json({ error: "Invalid clientId" });
+  if (isNaN(clientId)) {
+    res.status(400).json({ error: "Invalid clientId" });
+    return;
+  }
 
   try {
     await db

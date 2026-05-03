@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db, reportsTable, clientsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { CreateReportBody, UpdateReportBody } from "@workspace/api-zod";
 import crypto from "crypto";
 
@@ -10,12 +10,22 @@ const router = Router();
 function requireAuth(req: any, res: any, next: any) {
   const auth = getAuth(req);
   const userId = auth?.sessionClaims?.userId || auth?.userId;
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
   req.userId = userId;
   next();
 }
 
-async function enrichReport(report: any, db: any) {
+/** Convert a Date or string to a YYYY-MM-DD string for Drizzle date columns. */
+function toDateString(value: Date | string | undefined | null): string | undefined {
+  if (value == null) return undefined;
+  if (value instanceof Date) return value.toISOString().split("T")[0];
+  return value;
+}
+
+async function enrichReport(report: any) {
   const [client] = await db
     .select()
     .from(clientsTable)
@@ -29,7 +39,7 @@ async function enrichReport(report: any, db: any) {
   };
 }
 
-router.get("/reports", requireAuth, async (req: any, res) => {
+router.get("/reports", requireAuth, async (req: any, res): Promise<void> => {
   try {
     const clientId = req.query.clientId ? parseInt(req.query.clientId) : undefined;
 
@@ -53,7 +63,7 @@ router.get("/reports", requireAuth, async (req: any, res) => {
       .from(reportsTable)
       .leftJoin(clientsTable, eq(reportsTable.clientId, clientsTable.id));
 
-    const conditions = [eq(reportsTable.userId, req.userId)];
+    const conditions: any[] = [eq(reportsTable.userId, req.userId)];
     if (clientId) conditions.push(eq(reportsTable.clientId, clientId));
 
     const reports = await (query as any).where(and(...conditions));
@@ -64,9 +74,12 @@ router.get("/reports", requireAuth, async (req: any, res) => {
   }
 });
 
-router.post("/reports", requireAuth, async (req: any, res) => {
+router.post("/reports", requireAuth, async (req: any, res): Promise<void> => {
   const parsed = CreateReportBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
 
   try {
     const isPublic = parsed.data.isPublic ?? false;
@@ -79,10 +92,12 @@ router.post("/reports", requireAuth, async (req: any, res) => {
         userId: req.userId,
         isPublic,
         shareToken,
+        dateRangeStart: toDateString(parsed.data.dateRangeStart) as string,
+        dateRangeEnd: toDateString(parsed.data.dateRangeEnd) as string,
       })
       .returning();
 
-    const enriched = await enrichReport(report, db);
+    const enriched = await enrichReport(report);
     res.status(201).json(enriched);
   } catch (err) {
     req.log.error({ err }, "Failed to create report");
@@ -90,7 +105,7 @@ router.post("/reports", requireAuth, async (req: any, res) => {
   }
 });
 
-router.get("/reports/shared/:shareToken", async (req, res) => {
+router.get("/reports/shared/:shareToken", async (req, res): Promise<void> => {
   try {
     const [report] = await db
       .select({
@@ -118,7 +133,10 @@ router.get("/reports/shared/:shareToken", async (req, res) => {
         ),
       );
 
-    if (!report) return res.status(404).json({ error: "Report not found" });
+    if (!report) {
+      res.status(404).json({ error: "Report not found" });
+      return;
+    }
     res.json(report);
   } catch (err) {
     (req as any).log.error({ err }, "Failed to get shared report");
@@ -126,9 +144,12 @@ router.get("/reports/shared/:shareToken", async (req, res) => {
   }
 });
 
-router.get("/reports/:reportId", requireAuth, async (req: any, res) => {
+router.get("/reports/:reportId", requireAuth, async (req: any, res): Promise<void> => {
   const reportId = parseInt(req.params.reportId);
-  if (isNaN(reportId)) return res.status(400).json({ error: "Invalid reportId" });
+  if (isNaN(reportId)) {
+    res.status(400).json({ error: "Invalid reportId" });
+    return;
+  }
 
   try {
     const [report] = await db
@@ -152,7 +173,10 @@ router.get("/reports/:reportId", requireAuth, async (req: any, res) => {
       .leftJoin(clientsTable, eq(reportsTable.clientId, clientsTable.id))
       .where(and(eq(reportsTable.id, reportId), eq(reportsTable.userId, req.userId)));
 
-    if (!report) return res.status(404).json({ error: "Report not found" });
+    if (!report) {
+      res.status(404).json({ error: "Report not found" });
+      return;
+    }
     res.json(report);
   } catch (err) {
     req.log.error({ err }, "Failed to get report");
@@ -160,12 +184,18 @@ router.get("/reports/:reportId", requireAuth, async (req: any, res) => {
   }
 });
 
-router.put("/reports/:reportId", requireAuth, async (req: any, res) => {
+router.put("/reports/:reportId", requireAuth, async (req: any, res): Promise<void> => {
   const reportId = parseInt(req.params.reportId);
-  if (isNaN(reportId)) return res.status(400).json({ error: "Invalid reportId" });
+  if (isNaN(reportId)) {
+    res.status(400).json({ error: "Invalid reportId" });
+    return;
+  }
 
   const parsed = UpdateReportBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error });
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error });
+    return;
+  }
 
   try {
     const existing = await db
@@ -173,9 +203,21 @@ router.put("/reports/:reportId", requireAuth, async (req: any, res) => {
       .from(reportsTable)
       .where(and(eq(reportsTable.id, reportId), eq(reportsTable.userId, req.userId)));
 
-    if (!existing[0]) return res.status(404).json({ error: "Report not found" });
+    if (!existing[0]) {
+      res.status(404).json({ error: "Report not found" });
+      return;
+    }
 
     const updateData: any = { ...parsed.data };
+
+    // Convert Date objects to YYYY-MM-DD strings for Drizzle date columns
+    if (parsed.data.dateRangeStart != null) {
+      updateData.dateRangeStart = toDateString(parsed.data.dateRangeStart);
+    }
+    if (parsed.data.dateRangeEnd != null) {
+      updateData.dateRangeEnd = toDateString(parsed.data.dateRangeEnd);
+    }
+
     if (parsed.data.isPublic === true && !existing[0].shareToken) {
       updateData.shareToken = crypto.randomBytes(16).toString("hex");
     }
@@ -189,7 +231,7 @@ router.put("/reports/:reportId", requireAuth, async (req: any, res) => {
       .where(and(eq(reportsTable.id, reportId), eq(reportsTable.userId, req.userId)))
       .returning();
 
-    const enriched = await enrichReport(report, db);
+    const enriched = await enrichReport(report);
     res.json(enriched);
   } catch (err) {
     req.log.error({ err }, "Failed to update report");
@@ -197,9 +239,12 @@ router.put("/reports/:reportId", requireAuth, async (req: any, res) => {
   }
 });
 
-router.delete("/reports/:reportId", requireAuth, async (req: any, res) => {
+router.delete("/reports/:reportId", requireAuth, async (req: any, res): Promise<void> => {
   const reportId = parseInt(req.params.reportId);
-  if (isNaN(reportId)) return res.status(400).json({ error: "Invalid reportId" });
+  if (isNaN(reportId)) {
+    res.status(400).json({ error: "Invalid reportId" });
+    return;
+  }
 
   try {
     await db
