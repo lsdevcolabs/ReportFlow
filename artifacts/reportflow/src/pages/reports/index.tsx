@@ -67,7 +67,7 @@ export default function Reports() {
         </div>
         
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+          <SelectTrigger className="w-full sm:w-[160px]" data-testid="select-status-filter">
             <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Filter status" />
           </SelectTrigger>

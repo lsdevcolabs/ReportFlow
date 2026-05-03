@@ -406,13 +406,14 @@ export default function NewReport() {
             </CardContent>
           </Card>
 
-          <div className="flex items-center justify-between">
+          {/* Bottom actions — stack on mobile */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <FormField
               control={form.control}
               name="isPublic"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border bg-card p-4 w-full max-w-sm shadow-sm">
-                  <div className="space-y-0.5">
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border bg-card p-4 flex-1 shadow-sm">
+                  <div className="space-y-0.5 mr-4">
                     <FormLabel className="text-base">Publish Report</FormLabel>
                     <FormDescription>
                       Make this report viewable via public link
@@ -428,12 +429,12 @@ export default function NewReport() {
                 </FormItem>
               )}
             />
-            
-            <div className="flex gap-4">
-              <Link href="/reports">
-                <Button variant="outline" type="button" data-testid="button-cancel-report">Cancel</Button>
+
+            <div className="flex gap-3 sm:shrink-0">
+              <Link href="/reports" className="flex-1 sm:flex-none">
+                <Button variant="outline" type="button" className="w-full sm:w-auto" data-testid="button-cancel-report">Cancel</Button>
               </Link>
-              <Button type="submit" disabled={createReport.isPending} size="lg" data-testid="button-generate-report">
+              <Button type="submit" disabled={createReport.isPending} size="lg" className="flex-1 sm:flex-none" data-testid="button-generate-report">
                 {createReport.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Generate Report
               </Button>

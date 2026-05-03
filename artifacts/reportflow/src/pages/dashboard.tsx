@@ -40,8 +40,8 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Metrics Cards — 2 cols on mobile, 4 on large */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         {isLoadingMetrics ? (
           Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
@@ -80,7 +80,7 @@ export default function Dashboard() {
         ) : null}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-7">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-7">
         <Card className="md:col-span-4">
           <CardHeader>
             <CardTitle>Reports Over Time</CardTitle>
@@ -88,11 +88,11 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="pl-2">
             {isLoadingChart ? (
-              <div className="h-[300px] flex items-center justify-center">
+              <div className="h-[220px] sm:h-[280px] flex items-center justify-center">
                 <Skeleton className="h-full w-full" />
               </div>
             ) : chartData && chartData.length > 0 ? (
-              <div className="h-[300px]">
+              <div className="h-[220px] sm:h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -125,7 +125,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[220px] sm:h-[280px] flex items-center justify-center text-muted-foreground">
                 No data available.
               </div>
             )}

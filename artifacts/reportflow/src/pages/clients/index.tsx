@@ -70,18 +70,16 @@ export default function Clients() {
         </Button>
       </div>
 
-      <div className="flex items-center space-x-2 w-full max-w-sm">
-        <div className="relative w-full">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search clients..."
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="input-search-clients"
-          />
-        </div>
+      <div className="relative w-full sm:max-w-sm">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Search clients..."
+          className="pl-8 w-full"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          data-testid="input-search-clients"
+        />
       </div>
 
       <div className="bg-card rounded-lg border shadow-sm overflow-hidden">

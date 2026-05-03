@@ -310,3 +310,31 @@
     inset: -1px;
   }
 }
+
+/* ── Mobile / touch improvements ─────────────────────────────── */
+
+/* Prevent iOS auto-zoom on form inputs (requires font-size ≥ 16px) */
+@media screen and (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="url"],
+  input[type="date"],
+  input[type="color"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* Faster tap response on touch devices */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Smooth momentum scrolling on iOS */
+* {
+  -webkit-overflow-scrolling: touch;
+}
