@@ -1,0 +1,8 @@
+export { default as Dashboard } from './dashboard';
+export { default as Clients } from './clients/index';
+export { default as ClientDetail } from './clients/client-detail';
+export { default as Reports } from './reports/index';
+export { default as NewReport } from './reports/new';
+export { default as ReportDetail } from './reports/report-detail';
+export { default as SharedReport } from './reports/shared';
+export { default as Settings } from './settings';

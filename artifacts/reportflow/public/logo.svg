@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
+  <!-- Small icon -->
+  <path d="M10 20 C 10 10, 20 10, 20 20 C 20 30, 30 30, 30 20" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="30" cy="20" r="4" fill="currentColor"/>
+  <!-- Wordmark -->
+  <text x="45" y="26" font-family="sans-serif" font-weight="bold" font-size="20" fill="currentColor">ReportFlow</text>
+</svg>

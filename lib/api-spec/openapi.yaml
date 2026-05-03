@@ -3,20 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ReportFlow API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: clients
+    description: Client management
+  - name: reports
+    description: Report management
+  - name: metrics
+    description: Dashboard metrics and analytics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +30,239 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /clients:
+    get:
+      operationId: listClients
+      tags: [clients]
+      summary: List all clients for the authenticated user
+      responses:
+        "200":
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Create a new client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientBody"
+      responses:
+        "201":
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  /clients/{clientId}:
+    get:
+      operationId: getClient
+      tags: [clients]
+      summary: Get a single client
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Client found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "404":
+          description: Not found
+    put:
+      operationId: updateClient
+      tags: [clients]
+      summary: Update a client
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateClientBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+    delete:
+      operationId: deleteClient
+      tags: [clients]
+      summary: Delete a client
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List all reports for the authenticated user
+      parameters:
+        - name: clientId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+    post:
+      operationId: createReport
+      tags: [reports]
+      summary: Create a new report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportBody"
+      responses:
+        "201":
+          description: Report created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /reports/{reportId}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get a single report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Report found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "404":
+          description: Not found
+    put:
+      operationId: updateReport
+      tags: [reports]
+      summary: Update a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReportBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+    delete:
+      operationId: deleteReport
+      tags: [reports]
+      summary: Delete a report
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /reports/shared/{shareToken}:
+    get:
+      operationId: getSharedReport
+      tags: [reports]
+      summary: Get a publicly shared report by token (no auth required)
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shared report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "404":
+          description: Not found
+
+  /metrics/dashboard:
+    get:
+      operationId: getDashboardMetrics
+      tags: [metrics]
+      summary: Get summary metrics for the user dashboard
+      responses:
+        "200":
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardMetrics"
+
+  /metrics/reports-over-time:
+    get:
+      operationId: getReportsOverTime
+      tags: [metrics]
+      summary: Get report generation counts over time (last 30 days)
+      responses:
+        "200":
+          description: Time series data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeSeriesPoint"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +273,249 @@ components:
       required:
         - status
 
+    Client:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        projectType:
+          type: string
+        brandColor:
+          type: string
+          nullable: true
+        logoUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        reportCount:
+          type: integer
+      required:
+        - id
+        - userId
+        - name
+        - email
+        - projectType
+        - createdAt
+        - reportCount
+
+    CreateClientBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        projectType:
+          type: string
+        brandColor:
+          type: string
+          nullable: true
+        logoUrl:
+          type: string
+          nullable: true
+      required:
+        - name
+        - email
+        - projectType
+
+    UpdateClientBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        projectType:
+          type: string
+        brandColor:
+          type: string
+          nullable: true
+        logoUrl:
+          type: string
+          nullable: true
+
+    ReportMetricsData:
+      type: object
+      properties:
+        organicTraffic:
+          type: integer
+          nullable: true
+        paidTraffic:
+          type: integer
+          nullable: true
+        conversions:
+          type: integer
+          nullable: true
+        conversionRate:
+          type: number
+          nullable: true
+        impressions:
+          type: integer
+          nullable: true
+        clicks:
+          type: integer
+          nullable: true
+        ctr:
+          type: number
+          nullable: true
+        spend:
+          type: number
+          nullable: true
+        roas:
+          type: number
+          nullable: true
+        socialFollowers:
+          type: integer
+          nullable: true
+        socialEngagement:
+          type: number
+          nullable: true
+        emailSubscribers:
+          type: integer
+          nullable: true
+        emailOpenRate:
+          type: number
+          nullable: true
+        previousOrganicTraffic:
+          type: integer
+          nullable: true
+        previousConversions:
+          type: integer
+          nullable: true
+        previousSpend:
+          type: number
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        userId:
+          type: string
+        title:
+          type: string
+        dateRangeStart:
+          type: string
+          format: date
+        dateRangeEnd:
+          type: string
+          format: date
+        data:
+          $ref: "#/components/schemas/ReportMetricsData"
+        shareToken:
+          type: string
+          nullable: true
+        isPublic:
+          type: boolean
+        clientName:
+          type: string
+        clientEmail:
+          type: string
+        clientProjectType:
+          type: string
+        clientBrandColor:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clientId
+        - userId
+        - title
+        - dateRangeStart
+        - dateRangeEnd
+        - data
+        - isPublic
+        - clientName
+        - clientEmail
+        - clientProjectType
+        - createdAt
+
+    CreateReportBody:
+      type: object
+      properties:
+        clientId:
+          type: integer
+        title:
+          type: string
+        dateRangeStart:
+          type: string
+          format: date
+        dateRangeEnd:
+          type: string
+          format: date
+        data:
+          $ref: "#/components/schemas/ReportMetricsData"
+        isPublic:
+          type: boolean
+      required:
+        - clientId
+        - title
+        - dateRangeStart
+        - dateRangeEnd
+        - data
+
+    UpdateReportBody:
+      type: object
+      properties:
+        title:
+          type: string
+        dateRangeStart:
+          type: string
+          format: date
+        dateRangeEnd:
+          type: string
+          format: date
+        data:
+          $ref: "#/components/schemas/ReportMetricsData"
+        isPublic:
+          type: boolean
+
+    DashboardMetrics:
+      type: object
+      properties:
+        totalClients:
+          type: integer
+        totalReports:
+          type: integer
+        reportsThisMonth:
+          type: integer
+        sharedReports:
+          type: integer
+        recentReports:
+          type: array
+          items:
+            $ref: "#/components/schemas/Report"
+      required:
+        - totalClients
+        - totalReports
+        - reportsThisMonth
+        - sharedReports
+        - recentReports
+
+    TimeSeriesPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        count:
+          type: integer
+      required:
+        - date
+        - count
