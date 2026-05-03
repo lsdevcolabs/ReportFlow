@@ -8,6 +8,32 @@
 import * as zod from "zod";
 
 /**
+ * @summary Get the current user's profile
+ */
+export const GetUserProfileResponse = zod.object({
+  id: zod.number(),
+  userId: zod.string(),
+  plan: zod.enum(["free", "starter", "pro"]),
+  onboardingComplete: zod.boolean(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Create or update the current user's profile (plan selection)
+ */
+export const SaveUserProfileBody = zod.object({
+  plan: zod.enum(["free", "starter", "pro"]),
+});
+
+export const SaveUserProfileResponse = zod.object({
+  id: zod.number(),
+  userId: zod.string(),
+  plan: zod.enum(["free", "starter", "pro"]),
+  onboardingComplete: zod.boolean(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({

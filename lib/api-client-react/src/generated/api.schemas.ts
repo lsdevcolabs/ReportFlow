@@ -104,6 +104,36 @@ export interface TimeSeriesPoint {
   count: number;
 }
 
+export type UserProfilePlan =
+  (typeof UserProfilePlan)[keyof typeof UserProfilePlan];
+
+export const UserProfilePlan = {
+  free: "free",
+  starter: "starter",
+  pro: "pro",
+} as const;
+
+export interface UserProfile {
+  id: number;
+  userId: string;
+  plan: UserProfilePlan;
+  onboardingComplete: boolean;
+  createdAt: string;
+}
+
+export type SaveUserProfileBodyPlan =
+  (typeof SaveUserProfileBodyPlan)[keyof typeof SaveUserProfileBodyPlan];
+
+export const SaveUserProfileBodyPlan = {
+  free: "free",
+  starter: "starter",
+  pro: "pro",
+} as const;
+
+export interface SaveUserProfileBody {
+  plan: SaveUserProfileBodyPlan;
+}
+
 export type ListReportsParams = {
   clientId?: number;
 };

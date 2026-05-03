@@ -9,3 +9,4 @@ export { default as Settings } from './settings';
 export { default as About } from './about';
 export { default as Contact } from './contact';
 export { default as Privacy } from './privacy';
+export { default as Onboarding } from './onboarding';

@@ -24,9 +24,11 @@ import type {
   HealthStatus,
   ListReportsParams,
   Report,
+  SaveUserProfileBody,
   TimeSeriesPoint,
   UpdateClientBody,
   UpdateReportBody,
+  UserProfile,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -37,6 +39,167 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+/**
+ * @summary Get the current user's profile
+ */
+export const getGetUserProfileUrl = () => {
+  return `/api/user/profile`;
+};
+
+export const getUserProfile = async (
+  options?: RequestInit,
+): Promise<UserProfile> => {
+  return customFetch<UserProfile>(getGetUserProfileUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetUserProfileQueryKey = () => {
+  return [`/api/user/profile`] as const;
+};
+
+export const getGetUserProfileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserProfile>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getUserProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetUserProfileQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserProfile>>> = ({
+    signal,
+  }) => getUserProfile({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUserProfile>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetUserProfileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUserProfile>>
+>;
+export type GetUserProfileQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current user's profile
+ */
+
+export function useGetUserProfile<
+  TData = Awaited<ReturnType<typeof getUserProfile>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getUserProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetUserProfileQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create or update the current user's profile (plan selection)
+ */
+export const getSaveUserProfileUrl = () => {
+  return `/api/user/profile`;
+};
+
+export const saveUserProfile = async (
+  saveUserProfileBody: SaveUserProfileBody,
+  options?: RequestInit,
+): Promise<UserProfile> => {
+  return customFetch<UserProfile>(getSaveUserProfileUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveUserProfileBody),
+  });
+};
+
+export const getSaveUserProfileMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveUserProfile>>,
+    TError,
+    { data: BodyType<SaveUserProfileBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveUserProfile>>,
+  TError,
+  { data: BodyType<SaveUserProfileBody> },
+  TContext
+> => {
+  const mutationKey = ["saveUserProfile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveUserProfile>>,
+    { data: BodyType<SaveUserProfileBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return saveUserProfile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveUserProfileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveUserProfile>>
+>;
+export type SaveUserProfileMutationBody = BodyType<SaveUserProfileBody>;
+export type SaveUserProfileMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create or update the current user's profile (plan selection)
+ */
+export const useSaveUserProfile = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveUserProfile>>,
+    TError,
+    { data: BodyType<SaveUserProfileBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveUserProfile>>,
+  TError,
+  { data: BodyType<SaveUserProfileBody> },
+  TContext
+> => {
+  return useMutation(getSaveUserProfileMutationOptions(options));
+};
 
 /**
  * @summary Health check

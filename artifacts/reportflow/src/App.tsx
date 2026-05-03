@@ -6,6 +6,7 @@ import { Switch, Route, useLocation, Redirect, Router as WouterRouter } from "wo
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Loader2 } from "lucide-react";
 
 import NotFound from "@/pages/not-found";
 import {
@@ -13,9 +14,11 @@ import {
   Reports, NewReport, ReportDetail,
   SharedReport, Settings,
   About, Contact, Privacy,
+  Onboarding,
 } from "@/pages";
 import LandingPage from "@/pages/landing";
 import { AppLayout } from "@/components/layout";
+import { useGetUserProfile, getGetUserProfileQueryKey } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient();
 
@@ -97,7 +100,12 @@ function SignInPage() {
 function SignUpPage() {
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-muted/30 px-4 py-8">
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+      <SignUp
+        routing="path"
+        path={`${basePath}/sign-up`}
+        signInUrl={`${basePath}/sign-in`}
+        forceRedirectUrl={`${basePath}/onboarding`}
+      />
     </div>
   );
 }
@@ -121,6 +129,34 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+/** Shown while we fetch the user profile to decide where to route. */
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-muted/20">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+/**
+ * Checks whether the signed-in user has completed onboarding.
+ * If not, redirects to /onboarding. Otherwise renders the dashboard layout.
+ */
+function OnboardingCheck({ children }: { children: React.ReactNode }) {
+  const { data: profile, isLoading } = useGetUserProfile({
+    query: { retry: 1, queryKey: getGetUserProfileQueryKey() },
+  });
+
+  if (isLoading) return <LoadingScreen />;
+
+  // profile is null (no row yet) or onboarding not finished → go to onboarding
+  if (!profile || !profile.onboardingComplete) {
+    return <Redirect to="/onboarding" />;
+  }
+
+  return <AppLayout>{children}</AppLayout>;
+}
+
 function HomeRedirect() {
   return (
     <>
@@ -134,11 +170,26 @@ function HomeRedirect() {
   );
 }
 
+/** Requires sign-in; also gates on onboarding completion. */
 function DashboardGuard({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Show when="signed-in">
-        <AppLayout>{children}</AppLayout>
+        <OnboardingCheck>{children}</OnboardingCheck>
+      </Show>
+      <Show when="signed-out">
+        <Redirect to="/" />
+      </Show>
+    </>
+  );
+}
+
+/** Requires sign-in only (no onboarding check — this IS the onboarding). */
+function OnboardingGuard() {
+  return (
+    <>
+      <Show when="signed-in">
+        <Onboarding />
       </Show>
       <Show when="signed-out">
         <Redirect to="/" />
@@ -177,6 +228,9 @@ function ClerkProviderWithRoutes() {
             {/* Auth */}
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
+
+            {/* Onboarding — sign-in required, no onboarding-check */}
+            <Route path="/onboarding" component={OnboardingGuard} />
 
             {/* Public shared report */}
             <Route path="/reports/shared/:shareToken" component={SharedReport} />

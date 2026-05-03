@@ -16,8 +16,40 @@ tags:
     description: Report management
   - name: metrics
     description: Dashboard metrics and analytics
+  - name: user
+    description: User profile and onboarding
 
 paths:
+  /user/profile:
+    get:
+      operationId: getUserProfile
+      tags: [user]
+      summary: Get the current user's profile
+      responses:
+        "200":
+          description: User profile or null if not set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    post:
+      operationId: saveUserProfile
+      tags: [user]
+      summary: Create or update the current user's profile (plan selection)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveUserProfileBody"
+      responses:
+        "200":
+          description: Profile saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
   /healthz:
     get:
       operationId: healthCheck
@@ -519,3 +551,34 @@ components:
       required:
         - date
         - count
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        plan:
+          type: string
+          enum: [free, starter, pro]
+        onboardingComplete:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - plan
+        - onboardingComplete
+        - createdAt
+
+    SaveUserProfileBody:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [free, starter, pro]
+      required:
+        - plan
