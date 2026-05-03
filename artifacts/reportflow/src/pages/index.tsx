@@ -6,3 +6,6 @@ export { default as NewReport } from './reports/new';
 export { default as ReportDetail } from './reports/report-detail';
 export { default as SharedReport } from './reports/shared';
 export { default as Settings } from './settings';
+export { default as About } from './about';
+export { default as Contact } from './contact';
+export { default as Privacy } from './privacy';
