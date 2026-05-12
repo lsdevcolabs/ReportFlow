@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useUser } from "@clerk/react";
 import {
   useSaveUserProfile,
   useCreateBillingCheckout,
@@ -62,12 +63,16 @@ const plans = [
 ];
 
 export default function Onboarding() {
+  const { user } = useUser();
   const [selected, setSelected] = useState<"free" | "starter" | "pro" | null>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const saveProfile = useSaveUserProfile();
   const createCheckout = useCreateBillingCheckout();
+
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+  const userName = user?.fullName || user?.firstName;
 
   const isPending = saveProfile.isPending || createCheckout.isPending;
 
@@ -79,7 +84,7 @@ export default function Onboarding() {
 
     if (selected === "free") {
       saveProfile.mutate(
-        { data: { plan: "free" } },
+        { data: { plan: "free", email: userEmail, name: userName } },
         {
           onSuccess: (savedProfile) => {
             // Write directly into cache so OnboardingCheck sees onboardingComplete:true immediately

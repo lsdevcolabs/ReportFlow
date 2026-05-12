@@ -12,6 +12,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +63,35 @@ export default function ReportDetail() {
         },
       }
     );
+  };
+
+  const handleDownloadPdf = async () => {
+    try {
+      const response = await fetch(`/api/reports/${reportId}/pdf`);
+      if (!response.ok) {
+        const error = await response.json();
+        if (response.status === 403 && error.error === "PLAN_LIMIT_REACHED") {
+          toast({
+            title: "PDF export requires upgrade",
+            description: "Upgrade to Starter or Pro to export PDFs.",
+            variant: "default",
+          });
+          return;
+        }
+        throw new Error("Failed to download PDF");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${report?.title || "report"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      toast({ title: "Failed to download PDF", variant: "destructive" });
+    }
   };
 
   if (isLoading) {
@@ -183,6 +213,15 @@ export default function ReportDetail() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadPdf}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" /> PDF
+          </Button>
         </div>
       </div>
 

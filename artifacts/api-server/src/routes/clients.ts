@@ -1,10 +1,19 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, clientsTable } from "@workspace/db";
+import { db, clientsTable, userProfilesTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { CreateClientBody, UpdateClientBody } from "@workspace/api-zod";
+import { capture, AnalyticsEvents } from "../lib/analytics";
 
 const router = Router();
+
+type Plan = "free" | "starter" | "pro";
+
+const PLAN_CLIENT_LIMITS: Record<Plan, number> = {
+  free: 1,
+  starter: 5,
+  pro: Infinity,
+};
 
 function requireAuth(req: any, res: any, next: any) {
   const auth = getAuth(req);
@@ -50,10 +59,38 @@ router.post("/clients", requireAuth, async (req: any, res): Promise<void> => {
   }
 
   try {
+    const [profile] = await db
+      .select()
+      .from(userProfilesTable)
+      .where(eq(userProfilesTable.userId, req.userId));
+
+    const currentPlan: Plan = (profile?.plan as Plan) || "free";
+    const maxClients = PLAN_CLIENT_LIMITS[currentPlan] ?? 1;
+
+    const existingClients = await db
+      .select({ id: clientsTable.id })
+      .from(clientsTable)
+      .where(eq(clientsTable.userId, req.userId));
+
+    if (existingClients.length >= maxClients) {
+      res.status(403).json({
+        error: "PLAN_LIMIT_REACHED",
+        message: `Maximum clients (${maxClients}) reached for ${currentPlan} plan`,
+        upgradeUrl: "/settings"
+      });
+      return;
+    }
+
     const [client] = await db
       .insert(clientsTable)
       .values({ ...parsed.data, userId: req.userId })
       .returning();
+
+    capture(req.userId, AnalyticsEvents.CLIENT_CREATED, {
+      plan: currentPlan,
+      clientId: client.id,
+    });
+
     res.status(201).json({ ...client, reportCount: 0 });
   } catch (err) {
     req.log.error({ err }, "Failed to create client");

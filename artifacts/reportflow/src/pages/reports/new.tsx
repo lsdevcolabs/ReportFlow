@@ -118,44 +118,50 @@ export default function NewReport() {
     });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
-        const text = event.target?.result as string;
-        // Super basic CSV parser for demo purposes
-        const rows = text.split('\n');
-        if (rows.length > 1) {
-          const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
-          const values = rows[1].split(',').map(v => v.trim());
-          
-          const currentData = form.getValues("data");
-          const newData = { ...currentData };
-          
-          headers.forEach((header, i) => {
-            const val = parseFloat(values[i]);
-            if (!isNaN(val)) {
-              if (header.includes('organic') || header.includes('traffic')) newData.organicTraffic = val;
-              else if (header.includes('conversion') || header.includes('goal')) newData.conversions = val;
-              else if (header.includes('spend') || header.includes('cost')) newData.spend = val;
-              else if (header.includes('impression')) newData.impressions = val;
-              else if (header.includes('click')) newData.clicks = val;
-            }
-          });
-          
-          form.setValue("data", newData);
-          toast({ title: "Data imported successfully", description: "Metrics have been populated from your CSV." });
+        const csvText = event.target?.result as string;
+        
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ csv: csvText }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          if (error.error === "NO_MATCHING_COLUMNS") {
+            toast({
+              title: "No recognized columns found",
+              description: `Found: ${error.availableColumns?.join(", ")}`,
+              variant: "destructive",
+            });
+          } else {
+            toast({ title: "Failed to parse CSV", variant: "destructive" });
+          }
+          return;
         }
+
+        const result = await response.json();
+        const currentData = form.getValues("data");
+        const newData = { ...currentData, ...result.data };
+        
+        form.setValue("data", newData);
+        toast({ 
+          title: "Data imported successfully", 
+          description: `Imported ${result.rowCount} row(s): ${result.mappedColumns?.join(", ")}` 
+        });
       } catch (err) {
         toast({ title: "Failed to parse CSV", variant: "destructive" });
       }
     };
     reader.readAsText(file);
     
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 

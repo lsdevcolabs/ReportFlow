@@ -703,5 +703,10 @@ components:
         plan:
           type: string
           enum: [free, starter, pro]
+        email:
+          type: string
+          format: email
+        name:
+          type: string
       required:
         - plan

@@ -8,6 +8,7 @@ import {
 } from "@lemonsqueezy/lemonsqueezy.js";
 import { db, subscriptionsTable, userProfilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { capture, AnalyticsEvents } from "../lib/analytics";
 
 const router = Router();
 
@@ -69,6 +70,12 @@ router.post("/billing/checkout", requireAuth, async (req: any, res): Promise<voi
           target: userProfilesTable.userId,
           set: { plan, onboardingComplete: true },
         });
+
+      capture(req.userId, AnalyticsEvents.UPGRADE_CLICKED, {
+        from: "demo",
+        plan,
+      });
+
       res.json({ checkoutUrl: "/dashboard" });
     } catch (err) {
       req.log.error({ err }, "Demo mode checkout error");
@@ -97,6 +104,11 @@ router.post("/billing/checkout", requireAuth, async (req: any, res): Promise<voi
     const userEmail = (auth?.sessionClaims?.email as string) ?? undefined;
 
     const baseUrl = getAppBaseUrl();
+
+    capture(req.userId, AnalyticsEvents.UPGRADE_CLICKED, {
+      from: "billing_page",
+      plan,
+    });
 
     const { data, error } = await createCheckout(storeId, variantId, {
       checkoutData: {

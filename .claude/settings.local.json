@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(pnpm *)",
+      "Bash(xargs grep -l \"bg-gray-900\\\\|bg-slate-900\\\\|bg-zinc-900\\\\|dark:\\\\|dark:bg\\\\|from-zinc\\\\|from-slate\\\\|from-gray\")"
+    ]
+  }
+}

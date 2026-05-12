@@ -1,11 +1,20 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, reportsTable, clientsTable } from "@workspace/db";
+import { db, reportsTable, clientsTable, userProfilesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { CreateReportBody, UpdateReportBody } from "@workspace/api-zod";
+import { capture, AnalyticsEvents } from "../lib/analytics";
 import crypto from "crypto";
 
 const router = Router();
+
+type Plan = "free" | "starter" | "pro";
+
+const PLAN_REPORT_LIMITS: Record<Plan, number> = {
+  free: 3,
+  starter: Infinity,
+  pro: Infinity,
+};
 
 function requireAuth(req: any, res: any, next: any) {
   const auth = getAuth(req);
@@ -82,6 +91,30 @@ router.post("/reports", requireAuth, async (req: any, res): Promise<void> => {
   }
 
   try {
+    const [profile] = await db
+      .select()
+      .from(userProfilesTable)
+      .where(eq(userProfilesTable.userId, req.userId));
+
+    const currentPlan: Plan = (profile?.plan as Plan) || "free";
+    const maxReports = PLAN_REPORT_LIMITS[currentPlan] ?? 3;
+
+    if (maxReports !== Infinity) {
+      const existingReports = await db
+        .select({ id: reportsTable.id })
+        .from(reportsTable)
+        .where(eq(reportsTable.userId, req.userId));
+
+      if (existingReports.length >= maxReports) {
+        res.status(403).json({
+          error: "PLAN_LIMIT_REACHED",
+          message: `Maximum reports (${maxReports}) reached for ${currentPlan} plan`,
+          upgradeUrl: "/settings"
+        });
+        return;
+      }
+    }
+
     const isPublic = parsed.data.isPublic ?? false;
     const shareToken = isPublic ? crypto.randomBytes(16).toString("hex") : null;
 
@@ -98,6 +131,20 @@ router.post("/reports", requireAuth, async (req: any, res): Promise<void> => {
       .returning();
 
     const enriched = await enrichReport(report);
+
+    capture(req.userId, AnalyticsEvents.REPORT_CREATED, {
+      plan: currentPlan,
+      clientId: report.clientId,
+      reportId: report.id,
+    });
+
+    if (isPublic) {
+      capture(req.userId, AnalyticsEvents.REPORT_SHARED, {
+        plan: currentPlan,
+        reportId: report.id,
+      });
+    }
+
     res.status(201).json(enriched);
   } catch (err) {
     req.log.error({ err }, "Failed to create report");

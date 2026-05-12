@@ -189,6 +189,8 @@ export const SaveUserProfileBodyPlan = {
 
 export interface SaveUserProfileBody {
   plan: SaveUserProfileBodyPlan;
+  email?: string;
+  name?: string;
 }
 
 export type ListReportsParams = {

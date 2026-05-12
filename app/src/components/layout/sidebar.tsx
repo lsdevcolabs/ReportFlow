@@ -1,0 +1,102 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import {
+  LayoutDashboard,
+  Users,
+  FileBarChart,
+  Settings,
+  CreditCard,
+  Zap,
+} from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+
+const mainNavigation = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Clients", href: "/clients", icon: Users },
+  { name: "Reports", href: "/reports", icon: FileBarChart },
+];
+
+const secondaryNavigation = [
+  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Upgrade", href: "/upgrade", icon: CreditCard },
+];
+
+interface SidebarProps {
+  plan?: string;
+}
+
+export function Sidebar({ plan = "free" }: SidebarProps) {
+  const pathname = usePathname();
+
+  return (
+    <div className="fixed inset-y-0 z-50 flex w-64 flex-col bg-card border-r">
+      {/* Logo */}
+      <div className="flex h-16 shrink-0 items-center px-6 border-b">
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+            <Zap className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <span className="text-lg font-semibold">ReportFlow</span>
+        </Link>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex flex-1 flex-col gap-y-6 px-4 py-6">
+        <div className="space-y-1">
+          {mainNavigation.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.name}
+              </Link>
+            );
+          })}
+        </div>
+
+        <Separator />
+
+        <div className="space-y-1">
+          {secondaryNavigation.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.name}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Footer / Plan Badge */}
+      <div className="shrink-0 border-t p-4">
+        <div className="rounded-lg bg-muted/50 p-3">
+          <p className="text-xs font-medium text-muted-foreground">Current Plan</p>
+          <p className="text-sm font-semibold capitalize">{plan}</p>
+        </div>
+      </div>
+    </div>
+  );
+}

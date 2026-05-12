@@ -68,6 +68,8 @@ export const GetUserProfileResponse = zod.object({
  */
 export const SaveUserProfileBody = zod.object({
   plan: zod.enum(["free", "starter", "pro"]),
+  email: zod.string().email().optional(),
+  name: zod.string().optional(),
 });
 
 export const SaveUserProfileResponse = zod.object({

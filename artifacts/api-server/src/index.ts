@@ -1,5 +1,10 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { initSentry } from "./lib/sentry";
+import { initEmail } from "./lib/email";
+
+initSentry();
+initEmail();
 
 const rawPort = process.env["PORT"];
 

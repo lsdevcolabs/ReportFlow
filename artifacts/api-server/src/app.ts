@@ -1,7 +1,8 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
+import { captureException } from "./lib/sentry";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import {
   CLERK_PROXY_PATH,
@@ -51,5 +52,19 @@ app.use(
 );
 
 app.use("/api", router);
+
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
+  console.error("[Error]", err.message);
+  captureException(err, {
+    method: req.method,
+    url: req.url,
+    body: req.body,
+  });
+
+  res.status(500).json({
+    error: "INTERNAL_SERVER_ERROR",
+    message: process.env.NODE_ENV === "development" ? err.message : "Something went wrong",
+  });
+});
 
 export default app;

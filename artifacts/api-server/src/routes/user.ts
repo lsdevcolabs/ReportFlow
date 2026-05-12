@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db, userProfilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { sendWelcomeEmail } from "../lib/email";
 
 const router = Router();
 
@@ -33,13 +34,20 @@ router.get("/user/profile", requireAuth, async (req: any, res): Promise<void> =>
 });
 
 router.post("/user/profile", requireAuth, async (req: any, res): Promise<void> => {
-  const { plan } = req.body as { plan: Plan };
+  const { plan, email, name } = req.body as { plan: Plan; email?: string; name?: string };
   if (!plan || !VALID_PLANS.includes(plan)) {
     res.status(400).json({ error: "Invalid plan. Must be one of: free, starter, pro" });
     return;
   }
 
   try {
+    const [existingProfile] = await db
+      .select()
+      .from(userProfilesTable)
+      .where(eq(userProfilesTable.userId, req.userId));
+
+    const isNewUser = !existingProfile;
+
     const [profile] = await db
       .insert(userProfilesTable)
       .values({ userId: req.userId, plan, onboardingComplete: true })
@@ -48,6 +56,13 @@ router.post("/user/profile", requireAuth, async (req: any, res): Promise<void> =
         set: { plan, onboardingComplete: true },
       })
       .returning();
+
+    if (isNewUser && email) {
+      sendWelcomeEmail(email, name).catch((err) => {
+        req.log.error({ err }, "Failed to send welcome email");
+      });
+    }
+
     res.json(profile);
   } catch (err) {
     req.log.error({ err }, "Failed to save user profile");

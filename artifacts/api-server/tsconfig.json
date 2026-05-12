@@ -3,10 +3,14 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node"],
+    "jsx": "react"
   },
   "include": ["src"],
   "references": [
+    {
+      "path": "../../lib/plans"
+    },
     {
       "path": "../../lib/db"
     },
