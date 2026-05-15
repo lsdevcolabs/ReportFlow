@@ -94,7 +94,16 @@ const plans = [
   },
 ];
 
-export default function LandingPage() {
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+
+export default async function LandingPage() {
+  const { userId } = await auth();
+  
+  if (userId) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
