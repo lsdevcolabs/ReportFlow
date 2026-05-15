@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense, useEffect } from "react";
+import { useState, Suspense, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Upload, Eye, Loader2 } from "lucide-react";
@@ -236,6 +236,48 @@ function EditReportPageContent() {
     }
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+      
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+      if (lines.length < 2) {
+        alert("Invalid CSV format. Need headers and at least one row of data.");
+        return;
+      }
+      
+      const headers = lines[0].split(',').map(h => h.trim());
+      const values = lines[1].split(',').map(v => v.trim());
+      
+      const newData = { ...formData };
+      let updated = false;
+
+      headers.forEach((header, index) => {
+        const val = parseFloat(values[index]);
+        if (!isNaN(val) && header in newData) {
+          (newData as any)[header] = val;
+          updated = true;
+        }
+      });
+      
+      if (updated) {
+        setFormData(newData);
+        alert("CSV data imported successfully!");
+      } else {
+        alert("No matching metrics found in the CSV. Make sure your headers match the metric names (e.g., organicTraffic, spend, conversions).");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const selectedClient = clients.find((c) => c.id === formData.clientId);
 
   return (
@@ -343,10 +385,17 @@ function EditReportPageContent() {
                     <CardTitle>Metrics Data</CardTitle>
                     <CardDescription>Enter the performance data for this reporting period.</CardDescription>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                     <Upload className="mr-2 h-4 w-4" />
                     Import CSV
                   </Button>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                  />
                 </div>
               </CardHeader>
               <CardContent>
