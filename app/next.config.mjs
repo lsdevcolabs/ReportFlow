@@ -1,5 +1,3 @@
-import { withSentryConfig } from "@sentry/nextjs";
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -49,11 +47,4 @@ const nextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  silent: true,
-  webpack: {
-    autoInstrumentServerFunctions: true,
-    autoInstrumentMiddleware: false,
-    autoInstrumentAppDirectory: true,
-  },
-});
+export default nextConfig;
