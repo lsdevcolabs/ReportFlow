@@ -70,8 +70,11 @@ autoInstallPeers: false
 
 onlyBuiltDependencies:
   - '@swc/core'
+  - '@clerk/shared'
+  - '@sentry/cli'
   - esbuild
   - msw
+  - sharp
   - unrs-resolver
 
 overrides:
