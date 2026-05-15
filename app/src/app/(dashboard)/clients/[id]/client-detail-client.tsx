@@ -243,17 +243,12 @@ export default function ClientDetailClient({ initialClient, initialReports }: Cl
                       </Badge>
                       <div className="flex gap-1">
                         {report.isPublic && (
-                          <Button variant="ghost" size="icon" asChild>
+                          <Button variant="ghost" size="icon" asChild title="Open public link">
                             <a href={`/r/${report.shareToken}`} target="_blank">
                               <ExternalLink className="h-4 w-4" />
                             </a>
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" asChild>
-                          <Link href={`/reports/${report.id}`}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Link>
-                        </Button>
                       </div>
                     </div>
                   </div>
