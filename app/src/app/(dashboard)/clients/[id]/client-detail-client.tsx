@@ -87,40 +87,40 @@ export default function ClientDetailClient({ initialClient, initialReports }: Cl
   return (
     <div className="p-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/clients">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <Link href="/clients" className="shrink-0">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div className="flex items-center gap-3 min-w-0">
             {client.logoUrl ? (
               <img
                 src={client.logoUrl}
                 alt={client.name}
-                className="h-12 w-12 rounded-full object-contain"
+                className="h-12 w-12 rounded-full object-contain shrink-0"
               />
             ) : (
               <div 
-                className="h-12 w-12 rounded-full flex items-center justify-center text-white text-xl font-bold"
+                className="h-12 w-12 rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0"
                 style={{ backgroundColor: client.brandColor || "#2563EB" }}
               >
                 {client.name.charAt(0).toUpperCase()}
               </div>
             )}
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">{client.name}</h1>
-              {client.industry && <Badge variant="secondary">{client.industry}</Badge>}
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">{client.name}</h1>
+              {client.industry && <Badge variant="secondary" className="mt-1">{client.industry}</Badge>}
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditOpen(true)}>
+        <div className="flex gap-2 w-full sm:w-auto pt-2 sm:pt-0">
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setIsEditOpen(true)}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
           </Button>
-          <Button variant="outline" className="text-destructive hover:text-destructive" onClick={() => setIsDeleteOpen(true)}>
+          <Button variant="outline" className="text-destructive hover:text-destructive flex-1 sm:flex-none" onClick={() => setIsDeleteOpen(true)}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </Button>
