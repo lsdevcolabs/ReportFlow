@@ -6,7 +6,10 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 const DODO_API_KEY = process.env.DODO_PAYMENTS_API_KEY || "";
-const DODO_ENVIRONMENT = process.env.NODE_ENV === "development" ? "test_mode" : "live_mode";
+const isTestMode = process.env.NODE_ENV === "development" || 
+  (process.env.DODO_STARTER_PRODUCT_ID || "").includes("test") ||
+  (process.env.DODO_PRO_PRODUCT_ID || "").includes("test");
+const DODO_ENVIRONMENT = isTestMode ? "test_mode" : "live_mode";
 
 /**
  * POST /api/verify-payment
