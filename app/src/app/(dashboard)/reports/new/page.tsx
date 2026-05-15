@@ -296,17 +296,17 @@ function NewReportPageContent() {
             (newData as any)[key] = val;
             updated = true;
           }
-        } else if (headerLower === "report title" && parsedValues[index]) {
+        } else if ((headerLower === "report title" || headerLower === "reporttitle" || headerLower === "title") && parsedValues[index]) {
           newData.title = parsedValues[index];
           updated = true;
-        } else if (headerLower === "start date" && parsedValues[index]) {
+        } else if ((headerLower === "start date" || headerLower === "startdate") && parsedValues[index]) {
           // ensure valid date string before setting
           const d = new Date(parsedValues[index]);
           if (!isNaN(d.getTime())) {
             newData.dateRangeStart = d.toISOString().split("T")[0];
             updated = true;
           }
-        } else if (headerLower === "end date" && parsedValues[index]) {
+        } else if ((headerLower === "end date" || headerLower === "enddate") && parsedValues[index]) {
           const d = new Date(parsedValues[index]);
           if (!isNaN(d.getTime())) {
             newData.dateRangeEnd = d.toISOString().split("T")[0];
