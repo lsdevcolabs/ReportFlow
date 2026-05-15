@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserId } from "@/lib/clerk-auth";
 import Papa from "papaparse";
 import { z } from "zod";
 
@@ -145,16 +146,7 @@ function parseCSVData(csvData: string): ParseResult {
 
 export async function POST(req: NextRequest) {
   try {
-    const authModule = await import("@clerk/nextjs");
-    const { auth } = authModule;
-    let userId: string | null = null;
-
-    try {
-      const session = await auth();
-      userId = session.userId;
-    } catch {
-      userId = null;
-    }
+    const userId = await getCurrentUserId();
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

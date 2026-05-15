@@ -1,36 +1,17 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-const hasValidClerkKeys = publishableKey && 
-  publishableKey !== "pk_test_..." && 
-  publishableKey.length > 20;
+const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)", "/choose-plan(.*)", "/r(.*)"]);
 
-const publicPaths = ["/", "/sign-in", "/sign-up", "/r"];
-const isPublicPath = (path: string) => publicPaths.some(p => path === p || path.startsWith(p + "/"));
-
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (isPublicPath(pathname)) {
-    return NextResponse.next();
+export default clerkMiddleware((auth, request) => {
+  if (!isPublicRoute(request)) {
+    auth().protect();
   }
-
-  if (!hasValidClerkKeys) {
-    return NextResponse.next();
-  }
-
-  try {
-    const { authMiddleware } = await import("@clerk/nextjs");
-    return authMiddleware({
-      publicRoutes: ["/", "/sign-in", "/sign-up", "/r"],
-      debug: false,
-    })(request, {} as any);
-  } catch {
-    return NextResponse.next();
-  }
-}
+});
 
 export const config = {
-  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"],
+  matcher: [
+    '/((?!_next|[^?]*\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/',
+    '/(api|trpc)(.*)',
+  ],
 };

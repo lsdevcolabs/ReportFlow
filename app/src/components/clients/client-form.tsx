@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Building2, Loader2, Upload } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Building2, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,7 @@ export interface ClientFormData {
   website: string;
   industry: string;
   brandColor: string;
+  logoFile?: File;
   logoUrl?: string;
 }
 
@@ -46,21 +47,61 @@ export function ClientForm({
   const [website, setWebsite] = useState(initialData?.website || "");
   const [industry, setIndustry] = useState(initialData?.industry || "");
   const [brandColor, setBrandColor] = useState(initialData?.brandColor || "#2563EB");
+  const [logoPreview, setLogoPreview] = useState<string | null>(initialData?.logoUrl || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open && mode === "create") {
+      setName("");
+      setEmail("");
+      setWebsite("");
+      setIndustry("");
+      setBrandColor("#2563EB");
+      setLogoPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [open, mode]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File too large. Maximum size is 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setLogoPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => {
+    setLogoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
     try {
-      await onSubmit?.({ name, email, website, industry, brandColor });
+      const file = fileInputRef.current?.files?.[0];
+      await onSubmit?.({ name, email, website, industry, brandColor, logoFile: file });
       if (mode === "create") {
         setName("");
         setEmail("");
         setWebsite("");
         setIndustry("");
         setBrandColor("#2563EB");
+        setLogoPreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
+    } catch (error) {
+      console.error("Error submitting form:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -151,11 +192,34 @@ export function ClientForm({
             
             <div className="grid gap-2">
               <Label>Client Logo</Label>
-              <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer">
-                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm font-medium">Click to upload logo</p>
-                <p className="text-xs text-muted-foreground mt-1">SVG, PNG, or JPG (max 2MB)</p>
-              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              {logoPreview ? (
+                <div className="relative w-24 h-24 rounded-lg overflow-hidden border">
+                  <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain" />
+                  <button
+                    type="button"
+                    onClick={removeLogo}
+                    className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 hover:bg-destructive/80"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium">Click to upload logo</p>
+                  <p className="text-xs text-muted-foreground mt-1">SVG, PNG, or JPG (max 2MB)</p>
+                </div>
+              )}
             </div>
           </div>
           

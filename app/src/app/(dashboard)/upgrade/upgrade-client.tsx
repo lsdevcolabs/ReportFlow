@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle, ArrowRight, Loader2, ShieldCheck, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
 
 const plans = [
   {
@@ -70,8 +71,11 @@ interface UpgradeClientProps {
   currentPlan: string;
 }
 
-export default function UpgradeClient({ currentPlan }: UpgradeClientProps) {
+export default function UpgradeClient({ currentPlan: initialPlan }: UpgradeClientProps) {
   const [loading, setLoading] = useState<string | null>(null);
+  const [checkoutOpened, setCheckoutOpened] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState(initialPlan);
 
   const handleCheckout = async (plan: string) => {
     setLoading(plan);
@@ -86,7 +90,9 @@ export default function UpgradeClient({ currentPlan }: UpgradeClientProps) {
       const data = await res.json();
 
       if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+        // Open checkout in a new tab so user stays in the app
+        window.open(data.checkoutUrl, "_blank");
+        setCheckoutOpened(true);
       } else {
         alert("Failed to create checkout. Please try again.");
       }
@@ -97,25 +103,102 @@ export default function UpgradeClient({ currentPlan }: UpgradeClientProps) {
     }
   };
 
+  const handleVerifyPayment = async () => {
+    setVerifying(true);
+    try {
+      const res = await fetch("/api/verify-payment", { method: "POST" });
+      const data = await res.json();
+
+      if (data.updated && data.plan !== "free") {
+        setCurrentPlan(data.plan);
+        setCheckoutOpened(false);
+      } else if (data.plan === "free") {
+        alert("No active subscription found yet. If you just completed payment, please wait a moment and try again.");
+      } else {
+        alert(data.message || "Could not verify payment. Please try again in a moment.");
+      }
+    } catch {
+      alert("Failed to verify payment. Please try again.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const isPaidPlan = currentPlan !== "free";
+
   return (
     <div className="max-w-6xl mx-auto">
+      {/* Success banner when already on a paid plan */}
+      {isPaidPlan && (
+        <div className="mb-8 rounded-lg border border-green-500/30 bg-green-500/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="h-6 w-6 text-green-600 shrink-0" />
+            <div>
+              <p className="font-semibold text-green-700">You&apos;re on the {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)} Plan!</p>
+              <p className="text-sm text-muted-foreground">You have access to all {currentPlan === "pro" ? "premium" : "starter"} features.</p>
+            </div>
+          </div>
+          <Link href="/dashboard">
+            <Button size="sm" variant="outline">Go to Dashboard</Button>
+          </Link>
+        </div>
+      )}
+
+      {/* Checkout opened banner */}
+      {checkoutOpened && !isPaidPlan && (
+        <div className="mb-8 rounded-lg border border-primary/30 bg-primary/5 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-primary shrink-0" />
+            <div>
+              <p className="font-medium">Payment page opened in a new tab</p>
+              <p className="text-sm text-muted-foreground">Complete your payment, then click &quot;Verify Payment&quot; to activate your plan.</p>
+            </div>
+          </div>
+          <Button size="sm" onClick={handleVerifyPayment} disabled={verifying}>
+            {verifying ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            {verifying ? "Checking..." : "Verify Payment"}
+          </Button>
+        </div>
+      )}
+
       <div className="text-center mb-12">
-        <h1 className="text-3xl font-bold tracking-tight">Upgrade Your Plan</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          {isPaidPlan ? "Your Plan" : "Upgrade Your Plan"}
+        </h1>
         <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
-          Choose the plan that fits your needs. Start free and upgrade as you grow.
+          {isPaidPlan
+            ? "You're currently on a paid plan. Here's what you have access to."
+            : "Choose the plan that fits your needs. Start free and upgrade as you grow."
+          }
         </p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-8">
         {plans.map((plan) => {
           const isCurrentPlan = plan.name.toLowerCase() === currentPlan.toLowerCase();
+          const isDowngrade = isPaidPlan && !isCurrentPlan && (
+            (currentPlan === "pro" && plan.plan === "starter") ||
+            (currentPlan !== "free" && !plan.plan)
+          );
 
           return (
-            <Card key={plan.name} className={plan.popular ? "border-primary shadow-lg relative" : ""}>
-              {plan.popular && (
+            <Card key={plan.name} className={`${plan.popular && !isPaidPlan ? "border-primary shadow-lg relative" : ""} ${isCurrentPlan ? "border-green-500 shadow-lg relative ring-2 ring-green-500/20" : ""}`}>
+              {plan.popular && !isPaidPlan && !isCurrentPlan && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
                     Most Popular
+                  </span>
+                </div>
+              )}
+              {isCurrentPlan && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="bg-green-600 text-white text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Your Current Plan
                   </span>
                 </div>
               )}
@@ -134,7 +217,7 @@ export default function UpgradeClient({ currentPlan }: UpgradeClientProps) {
                 <ul className="space-y-2">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-primary shrink-0" />
+                      <CheckCircle className={`h-4 w-4 shrink-0 ${isCurrentPlan ? "text-green-600" : "text-primary"}`} />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -152,25 +235,35 @@ export default function UpgradeClient({ currentPlan }: UpgradeClientProps) {
                     </ul>
                   </div>
                 )}
-                {plan.plan ? (
+                {isCurrentPlan ? (
+                  <div className="w-full py-2 px-4 rounded-md bg-green-50 border border-green-200 text-center text-sm font-medium text-green-700">
+                    ✓ Active Plan
+                  </div>
+                ) : plan.plan ? (
                   <Button
                     className="w-full"
                     variant={plan.popular ? "default" : "outline"}
-                    onClick={() => handleCheckout(plan.plan)}
-                    disabled={isCurrentPlan || loading !== null}
+                    onClick={() => handleCheckout(plan.plan!)}
+                    disabled={loading !== null || isDowngrade}
                   >
                     {loading === plan.plan ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : null}
-                    {isCurrentPlan ? "Current Plan" : plan.cta}
+                    {isDowngrade ? "Current or Lower Tier" : plan.cta}
                   </Button>
                 ) : (
-                  <Button className="w-full" variant={plan.popular ? "default" : "outline"} asChild>
-                    <a href={plan.href}>
-                      {plan.cta}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </a>
-                  </Button>
+                  isPaidPlan ? (
+                    <Button className="w-full" variant="outline" disabled>
+                      Included in Your Plan
+                    </Button>
+                  ) : (
+                    <Button className="w-full" variant={plan.popular ? "default" : "outline"} asChild>
+                      <a href={plan.href}>
+                        {plan.cta}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </a>
+                    </Button>
+                  )
                 )}
               </CardContent>
             </Card>
@@ -207,7 +300,7 @@ export default function UpgradeClient({ currentPlan }: UpgradeClientProps) {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Yes, you can cancel your subscription at any time. You'll continue to have access until the end of your billing period.
+                Yes, you can cancel your subscription at any time. You&apos;ll continue to have access until the end of your billing period.
               </p>
             </CardContent>
           </Card>

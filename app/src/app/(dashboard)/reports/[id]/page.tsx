@@ -183,7 +183,10 @@ export default function ReportDetailPage() {
 
     try {
       const res = await fetch(`/api/reports/${report.id}/pdf`);
-      if (!res.ok) throw new Error("Failed to generate PDF");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || "Failed to generate PDF");
+      }
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -194,8 +197,9 @@ export default function ReportDetailPage() {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to download PDF", e);
+      alert(e.message || "Failed to download PDF");
     } finally {
       setIsDownloading(false);
     }
@@ -224,7 +228,7 @@ export default function ReportDetailPage() {
 
   return (
     <div className="p-8 space-y-8 max-w-5xl mx-auto">
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
         <Link href="/reports">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
@@ -246,7 +250,7 @@ export default function ReportDetailPage() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto mt-4 md:mt-0">
               <Button
                 variant="outline"
                 onClick={handleDownloadPDF}
@@ -285,9 +289,11 @@ export default function ReportDetailPage() {
               disabled={isPublishing}
             />
           </div>
-          <Button variant="outline">
-            <Edit className="mr-2 h-4 w-4" />
-            Edit
+          <Button variant="outline" asChild>
+            <Link href={`/reports/${report.id}/edit`}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </Link>
           </Button>
           <Button
             variant="outline"
@@ -302,7 +308,7 @@ export default function ReportDetailPage() {
 
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               {report.isPublic ? (
                 <>
@@ -331,7 +337,7 @@ export default function ReportDetailPage() {
 
       {/* KPI Cards */}
       {metricsData.summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">Total Sessions</p>

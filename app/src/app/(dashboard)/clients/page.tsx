@@ -1,9 +1,13 @@
+import { auth } from "@clerk/nextjs/server";
 import { getUserById } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { clients } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { getMaxClients } from "@/lib/plans";
 import ClientsClient from "./clients-client";
+
+// Allow Next.js to revalidate every 15 seconds instead of force-dynamic
+export const revalidate = 15;
 
 interface SearchParams {
   search?: string;
@@ -14,22 +18,15 @@ interface PageProps {
 }
 
 export default async function ClientsPage({ searchParams }: PageProps) {
-  let userId: string | null = null;
-  let plan = "free";
-  let maxClients = 1;
-  let userClients: typeof clients.$inferSelect[] = [];
-
-  try {
-    const { auth } = await import("@clerk/nextjs");
-    const { userId: uid } = await auth();
-    userId = uid;
-  } catch {
-    userId = null;
-  }
-
+  const { userId } = await auth();
+  
   if (!userId) {
     return <div>Please sign in to view clients.</div>;
   }
+
+  let plan = "free";
+  let maxClients = 1;
+  let userClients: typeof clients.$inferSelect[] = [];
 
   try {
     const user = await getUserById(userId);

@@ -161,7 +161,7 @@ export default function LandingPage() {
               </li>
             </ul>
             <p className="mt-8 text-lg font-medium">
-              For an agency with 10 clients, that's a full working day lost every single week.
+              For an agency with 10 clients, that&apos;s a full working day lost every single week.
             </p>
           </div>
         </div>
@@ -255,7 +255,7 @@ export default function LandingPage() {
             {testimonials.map((testimonial) => (
               <Card key={testimonial.author}>
                 <CardContent className="pt-6">
-                  <p className="text-lg mb-4">"{testimonial.quote}"</p>
+                  <p className="text-lg mb-4">&quot;{testimonial.quote}&quot;</p>
                   <div>
                     <p className="font-medium">{testimonial.author}</p>
                     <p className="text-sm text-muted-foreground">{testimonial.role}</p>

@@ -7,7 +7,7 @@ type Plan = "free" | "starter" | "pro";
 export type { Plan };
 
 const PLAN_LIMITS: Record<Plan, { maxClients: number; maxReports: number; whiteLabel: boolean; pdfExport: boolean }> = {
-  free: { maxClients: 1, maxReports: 3, whiteLabel: false, pdfExport: false },
+  free: { maxClients: 1, maxReports: 3, whiteLabel: false, pdfExport: true },
   starter: { maxClients: 5, maxReports: Infinity, whiteLabel: false, pdfExport: true },
   pro: { maxClients: Infinity, maxReports: Infinity, whiteLabel: true, pdfExport: true },
 };

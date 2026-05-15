@@ -4,7 +4,7 @@
 
 This guide walks you through setting up all external services required to deploy ReportFlow. Each service is free to start and only costs money when you have paid customers.
 
----
+------------------------------------------------------------------------------
 
 ## 1. Clerk Authentication (clerk.com)
 
@@ -59,7 +59,7 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
 NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
 ```
 
----
+------------------------------------------------------------------------------
 
 ## 2. Neon Database (neon.tech)
 
@@ -102,7 +102,7 @@ DATABASE_URL=postgresql://alex:Abc123@ep-silent-pond-123456.us-east-2.aws.neon.t
 
 > **Note:** The password contains special characters. In `.env.local`, keep it as-is. If issues occur, URL-encode special characters.
 
----
+------------------------------------------------------------------------------
 
 ## 3. Lemon Squeezy (lemonsqueezy.com)
 
@@ -189,7 +189,7 @@ LEMON_SQUEEZY_VARIANT_STARTER=1234-5678
 LEMON_SQUEEZY_VARIANT_PRO=9012-3456
 ```
 
----
+------------------------------------------------------------------------------
 
 ## 4. Vercel Blob (Vercel Dashboard)
 
@@ -222,7 +222,7 @@ Vercel Blob stores client logos and uploaded files. Free tier includes 1 GB stor
 BLOB_READ_WRITE_TOKEN=vercel_blob_abc123...
 ```
 
----
+------------------------------------------------------------------------------
 
 ## 5. Optional: PostHog Analytics (app.posthog.com)
 
@@ -247,7 +247,7 @@ NEXT_PUBLIC_POSTHOG_KEY=phc_xxxxxxxxxxxxxxxx
 NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
 ```
 
----
+------------------------------------------------------------------------------
 
 ## 6. Optional: Resend Email (resend.com)
 
@@ -274,7 +274,7 @@ RESEND_API_KEY=re_xxxxxxxxxxxxxxxx
 
 > **Note:** Resend gives you 3,000 free emails on their free tier.
 
----
+------------------------------------------------------------------------------
 
 ## 7. Optional: Sentry (sentry.io)
 
@@ -308,7 +308,7 @@ NEXT_PUBLIC_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
 SENTRY_AUTH_TOKEN=sntrys_xxx...
 ```
 
----
+------------------------------------------------------------------------------
 
 ## Complete .env.local Template
 
@@ -351,7 +351,7 @@ SENTRY_AUTH_TOKEN=sntrys_xxx
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
----
+------------------------------------------------------------------------------
 
 ## Deployment Checklist
 
@@ -400,7 +400,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
    - Test PDF generation
    - Test public report sharing
 
----
+------------------------------------------------------------------------------
 
 ## Quick Summary: Where to Find Each Key
 
@@ -420,7 +420,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 | Sentry | `NEXT_PUBLIC_SENTRY_DSN` | Project Settings → Client Keys |
 | Sentry | `SENTRY_AUTH_TOKEN` | Settings → Auth Tokens |
 
----
+------------------------------------------------------------------------------
 
 *Document Version: 1.0*
 *Last Updated: 2026-05-08*

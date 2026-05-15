@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { CreditCard, Building2, User, Palette, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CreditCard, Building2, User, Palette, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useUser, useClerk } from "@clerk/nextjs";
 
 const PLAN_LABELS: Record<string, string> = {
   free: "Free",
@@ -17,17 +18,62 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 export default function SettingsPage() {
+  const { user, isLoaded } = useUser();
+  const clerk = useClerk();
+
   const [agencyName, setAgencyName] = useState("My Agency");
   const [website, setWebsite] = useState("");
   const [brandColor, setBrandColor] = useState("#2563EB");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  
-  const currentPlan = "free"; // This would come from user context
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPlan, setCurrentPlan] = useState("free");
+  const [subscriptionStatus, setSubscriptionStatus] = useState("inactive");
+
+  useEffect(() => {
+    async function fetchUser() {
+      try {
+        const res = await fetch("/api/user");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            setAgencyName(data.user.agencyName || "My Agency");
+            setWebsite(data.user.agencyWebsite || "");
+            setBrandColor(data.user.agencyBrandColor || "#2563EB");
+            setLogoUrl(data.user.agencyLogoUrl || null);
+            setCurrentPlan(data.user.plan || "free");
+            setSubscriptionStatus(data.user.subscriptionStatus || "inactive");
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load user settings", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchUser();
+  }, []);
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
-    await new Promise((r) => setTimeout(r, 1000)); // Simulate API call
-    setIsSaving(false);
+    try {
+      const res = await fetch("/api/user", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agencyName,
+          agencyWebsite: website,
+          agencyBrandColor: brandColor,
+          agencyLogoUrl: logoUrl,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save settings");
+    } catch (error) {
+      console.error("Error saving settings", error);
+      alert("Failed to save settings");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleUpgrade = (plan: "starter" | "pro") => {
@@ -35,8 +81,27 @@ export default function SettingsPage() {
     console.log(`Upgrading to ${plan}`);
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("File is too large. Maximum size is 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const userName = user?.fullName || user?.firstName || "User Account";
+  const userInitial = userName.charAt(0).toUpperCase();
+  const userEmail = user?.primaryEmailAddress?.emailAddress || "No email";
+
   return (
-    <div className="p-8 max-w-4xl space-y-8">
+    <div className="p-4 md:p-8 max-w-4xl space-y-8 mx-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-1">Manage your account and preferences.</p>
@@ -54,20 +119,33 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
-              <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xl font-bold">
-                U
-              </div>
-              <div>
-                <p className="font-medium">User Account</p>
-                <p className="text-sm text-muted-foreground">user@example.com</p>
+              {isLoaded && user?.imageUrl ? (
+                <img 
+                  src={user.imageUrl} 
+                  alt={userName} 
+                  className="h-12 w-12 rounded-full object-cover border" 
+                />
+              ) : (
+                <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xl font-bold">
+                  {isLoaded ? userInitial : <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{isLoaded ? userName : "Loading..."}</p>
+                <p className="text-sm text-muted-foreground truncate">{isLoaded ? userEmail : ""}</p>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
               Account details are managed through your authentication provider.
               You can update your name, email, and password there.
             </p>
-            <Button variant="outline" className="w-full" disabled>
-              Manage Account (coming soon)
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => clerk.openUserProfile()}
+              disabled={!isLoaded}
+            >
+              Manage Account
             </Button>
           </CardContent>
         </Card>
@@ -84,27 +162,34 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between bg-muted/40 rounded-lg px-4 py-3 border">
               <div className="flex items-center gap-2">
-                <span className="font-semibold">{PLAN_LABELS[currentPlan]} Plan</span>
+                <span className="font-semibold">{PLAN_LABELS[currentPlan] || "Free"} Plan</span>
               </div>
-              <Badge variant="secondary">Active</Badge>
+              <Badge variant={currentPlan !== "free" ? "default" : "secondary"}>
+                {currentPlan !== "free" ? "Active" : "Free Tier"}
+              </Badge>
             </div>
 
             {currentPlan === "free" ? (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">Upgrade to unlock more clients and features.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button size="sm" variant="outline" onClick={() => handleUpgrade("starter")}>
-                    Starter · $9/mo
+                <a href="/upgrade">
+                  <Button size="sm" className="w-full">
+                    <ExternalLink className="mr-2 h-3 w-3" />
+                    View Upgrade Options
                   </Button>
-                  <Button size="sm" onClick={() => handleUpgrade("pro")}>
-                    Pro · $29/mo
-                  </Button>
-                </div>
+                </a>
               </div>
             ) : (
-              <Button variant="outline" className="w-full">
-                Manage Subscription
-              </Button>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  You are on the <strong>{PLAN_LABELS[currentPlan]}</strong> plan. Enjoy all your premium features!
+                </p>
+                <a href="/upgrade">
+                  <Button variant="outline" className="w-full">
+                    Manage Plan
+                  </Button>
+                </a>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -159,13 +244,26 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Agency Logo</Label>
-                  <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer">
-                    <div className="h-12 w-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-3">
-                      <Building2 className="h-6 w-6" />
-                    </div>
-                    <p className="font-medium">Click to upload logo</p>
-                    <p className="text-xs text-muted-foreground mt-1">SVG, PNG, or JPG (max 2MB)</p>
-                  </div>
+                  <Label htmlFor="logo-upload" className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer block">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Agency Logo" className="h-16 object-contain mb-2" />
+                    ) : (
+                      <>
+                        <div className="h-12 w-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-3">
+                          <Building2 className="h-6 w-6" />
+                        </div>
+                        <p className="font-medium">Click to upload logo</p>
+                        <p className="text-xs text-muted-foreground mt-1">SVG, PNG, or JPG (max 2MB)</p>
+                      </>
+                    )}
+                    <Input 
+                      id="logo-upload" 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleLogoUpload}
+                    />
+                  </Label>
                 </div>
 
                 <div className="space-y-2">
@@ -206,10 +304,14 @@ export default function SettingsPage() {
                         <div className="h-4 w-32 bg-muted rounded" />
                       </div>
                       <div
-                        className="h-8 w-8 rounded-full text-white flex items-center justify-center text-xs font-bold"
+                        className="h-8 w-8 rounded-full text-white flex items-center justify-center text-xs font-bold overflow-hidden"
                         style={{ backgroundColor: brandColor }}
                       >
-                        {agencyName.charAt(0).toUpperCase()}
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
+                        ) : (
+                          agencyName.charAt(0).toUpperCase()
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-auto">

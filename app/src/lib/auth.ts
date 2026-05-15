@@ -16,12 +16,6 @@ export async function ensureUserExists(clerkUserId: string, email?: string, name
     .limit(1);
 
   if (existingUser) {
-    // Update last seen (optional, for tracking)
-    await db
-      .update(users)
-      .set({ updatedAt: new Date() })
-      .where(eq(users.id, clerkUserId));
-    
     return existingUser;
   }
 

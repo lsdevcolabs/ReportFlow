@@ -2,7 +2,7 @@
 
 import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Upload, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,15 +80,15 @@ const initialFormData: ReportFormData = {
   notes: "",
 };
 
-export default function NewReportPage() {
+export default function EditReportPage() {
   return (
-    <Suspense fallback={<NewReportPageLoading />}>
-      <NewReportPageContent />
+    <Suspense fallback={<EditReportPageLoading />}>
+      <EditReportPageContent />
     </Suspense>
   );
 }
 
-function NewReportPageLoading() {
+function EditReportPageLoading() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b">
@@ -104,38 +104,79 @@ function NewReportPageLoading() {
   );
 }
 
-function NewReportPageContent() {
-  const searchParams = useSearchParams();
-  const initialClientId = searchParams.get("clientId") || "";
+function EditReportPageContent() {
+  const params = useParams();
+  const router = useRouter();
+  const reportId = params.id as string;
   
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);
+  const [loadingReport, setLoadingReport] = useState(true);
   
-  useEffect(() => {
-    async function fetchClients() {
-      try {
-        const res = await fetch("/api/clients");
-        if (res.ok) {
-          const data = await res.json();
-          setClients(data.clients || []);
-        }
-      } catch (e) {
-        console.error("Failed to fetch clients", e);
-      } finally {
-        setLoadingClients(false);
-      }
-    }
-    fetchClients();
-  }, []);
-
-  const [formData, setFormData] = useState<ReportFormData>({
-    ...initialFormData,
-    clientId: initialClientId,
-    dateRangeStart: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().split("T")[0],
-    dateRangeEnd: new Date().toISOString().split("T")[0],
-  });
+  const [formData, setFormData] = useState<ReportFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("traffic");
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [clientsRes, reportRes] = await Promise.all([
+          fetch("/api/clients"),
+          fetch(`/api/reports/${reportId}`)
+        ]);
+        
+        if (clientsRes.ok) {
+          const data = await clientsRes.json();
+          setClients(data.clients || []);
+        }
+        
+        if (reportRes.ok) {
+          const data = await reportRes.json();
+          if (data.report) {
+            const r = data.report;
+            const md = r.metricsData || {};
+            const summary = md.summary || {};
+            const organicChan = (md.channelBreakdown || []).find((c: any) => c.channel === "Organic");
+            const paidChan = (md.channelBreakdown || []).find((c: any) => c.channel === "Paid");
+            const getMetric = (label: string) => {
+              const m = (md.customMetrics || []).find((x: any) => x.label === label);
+              return m ? parseFloat(m.value.replace(/[^0-9.]/g, '')) : null;
+            };
+
+            setFormData({
+              clientId: r.clientId,
+              title: r.title,
+              dateRangeStart: r.dateRangeStart ? new Date(r.dateRangeStart).toISOString().split("T")[0] : "",
+              dateRangeEnd: r.dateRangeEnd ? new Date(r.dateRangeEnd).toISOString().split("T")[0] : "",
+              isPublic: r.isPublic,
+              organicTraffic: organicChan ? organicChan.sessions : null,
+              paidTraffic: paidChan ? paidChan.sessions : null,
+              previousOrganicTraffic: summary.previousSessions || null,
+              conversions: summary.conversions || null,
+              conversionRate: null,
+              previousConversions: summary.previousConversions || null,
+              spend: getMetric("Ad Spend"),
+              roas: getMetric("ROAS"),
+              impressions: null,
+              clicks: null,
+              ctr: null,
+              socialFollowers: getMetric("Social Followers"),
+              socialEngagement: null,
+              emailSubscribers: getMetric("Email Subscribers"),
+              emailOpenRate: null,
+              notes: md.notes || "",
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch data", e);
+      } finally {
+        setLoadingClients(false);
+        setLoadingReport(false);
+      }
+    }
+    fetchData();
+  }, [reportId]);
 
   const updateField = <K extends keyof ReportFormData>(field: K, value: ReportFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -174,16 +215,14 @@ function NewReportPageContent() {
         }
       };
 
-      const res = await fetch("/api/reports", {
-        method: "POST",
+      const res = await fetch(`/api/reports/${reportId}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        const data = await res.json();
-        // Redirect to the new report page
-        window.location.href = `/reports/${data.report.id}`;
+        router.push(`/reports/${reportId}`);
       } else {
         const errorData = await res.json();
         console.error("Failed to create report:", errorData);
@@ -209,15 +248,15 @@ function NewReportPageContent() {
             </Button>
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl font-semibold">Create New Report</h1>
+            <h1 className="text-xl font-semibold">Edit Report</h1>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/reports">Cancel</Link>
+            <Link href={`/reports/${reportId}`}>Cancel</Link>
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !formData.clientId || !formData.title}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || !formData.clientId || !formData.title || loadingReport}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <Save className="mr-2 h-4 w-4" />
-            Generate Report
+            Save Changes
           </Button>
         </div>
       </div>

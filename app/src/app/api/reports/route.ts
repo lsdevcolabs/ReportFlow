@@ -1,24 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserId } from "@/lib/clerk-auth";
+import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { reports, clients } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { checkReportLimit } from "@/lib/plan-limits";
 import type { Plan } from "@/lib/plan-limits";
-
-async function getAuthUserId(): Promise<string | null> {
-  try {
-    const { auth } = await import("@clerk/nextjs");
-    const { userId } = auth();
-    return userId;
-  } catch {
-    return null;
-  }
-}
+import { revalidatePath } from "next/cache";
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = await getAuthUserId();
+    const userId = await getCurrentUserId();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -68,17 +61,21 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await getAuthUserId();
-    if (!userId) {
+    const clerkUser = await currentUser();
+    if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = clerkUser.id;
 
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     }
 
+    const clerkEmail = clerkUser.emailAddresses[0]?.emailAddress;
+    const clerkName = clerkUser.firstName ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim() : null;
+
     const { ensureUserExists } = await import("@/lib/auth");
-    const user = await ensureUserExists(userId);
+    const user = await ensureUserExists(userId, clerkEmail, clerkName);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -134,6 +131,7 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
+    revalidatePath("/dashboard", "layout");
     return NextResponse.json({ report: newReport }, { status: 201 });
   } catch (error) {
     console.error("[POST /api/reports]", error);

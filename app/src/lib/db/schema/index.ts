@@ -17,13 +17,17 @@ export const users = pgTable("users", {
   lsCustomerId: text("ls_customer_id"), // Lemon Squeezy customer ID
   lsSubscriptionId: text("ls_subscription_id"), // Lemon Squeezy subscription ID
   subscriptionStatus: text("subscription_status").default("inactive"), // 'active' | 'past_due' | 'cancelled' | 'inactive'
+  agencyName: text("agency_name"),
+  agencyWebsite: text("agency_website"),
+  agencyLogoUrl: text("agency_logo_url"),
+  agencyBrandColor: varchar("agency_brand_color", { length: 7 }).default("#2563EB"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Clients table — each user manages multiple clients
 export const clients = pgTable("clients", {
-  id: text("id").primaryKey().default(nanoid(10)),
+  id: text("id").primaryKey().$defaultFn(() => nanoid(10)),
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -39,7 +43,7 @@ export const clients = pgTable("clients", {
 
 // Reports table — one report per client per reporting period
 export const reports = pgTable("reports", {
-  id: text("id").primaryKey().default(nanoid(10)),
+  id: text("id").primaryKey().$defaultFn(() => nanoid(10)),
   clientId: text("client_id")
     .notNull()
     .references(() => clients.id, { onDelete: "cascade" }),

@@ -1,24 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserId } from "@/lib/clerk-auth";
 import { db } from "@/lib/db";
 import { reports, clients } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-
-async function getAuthUserId(): Promise<string | null> {
-  try {
-    const { auth } = await import("@clerk/nextjs");
-    const { userId } = auth();
-    return userId;
-  } catch {
-    return null;
-  }
-}
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getAuthUserId();
+    const userId = await getCurrentUserId();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -63,7 +54,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getAuthUserId();
+    const userId = await getCurrentUserId();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -120,7 +111,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getAuthUserId();
+    const userId = await getCurrentUserId();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

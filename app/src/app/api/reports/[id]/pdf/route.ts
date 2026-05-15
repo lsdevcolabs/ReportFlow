@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUserId } from "@/lib/clerk-auth";
+import { currentUser } from "@clerk/nextjs/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { db } from "@/lib/db";
 import { reports, clients } from "@/lib/db/schema";
@@ -9,32 +11,26 @@ import { ReportPDFDocument } from "@/components/reports/report-pdf";
 
 export const runtime = "nodejs";
 
-async function getAuthUserId(): Promise<string | null> {
-  try {
-    const { auth } = await import("@clerk/nextjs");
-    const { userId } = auth();
-    return userId;
-  } catch {
-    return null;
-  }
-}
-
-export async function POST(
+export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getAuthUserId();
-    if (!userId) {
+    const clerkUser = await currentUser();
+    if (!clerkUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = clerkUser.id;
 
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     }
 
+    const clerkEmail = clerkUser.emailAddresses[0]?.emailAddress;
+    const clerkName = clerkUser.firstName ? `${clerkUser.firstName} ${clerkUser.lastName || ''}`.trim() : null;
+
     const { ensureUserExists } = await import("@/lib/auth");
-    const user = await ensureUserExists(userId);
+    const user = await ensureUserExists(userId, clerkEmail, clerkName);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -73,6 +69,8 @@ export async function POST(
 
     const { report, client } = result;
 
+    const plan = user.plan as "free" | "starter" | "pro";
+
     const pdfBuffer = await renderToBuffer(
       ReportPDFDocument({
         report: {
@@ -84,6 +82,13 @@ export async function POST(
           metricsData: report.metricsData as Record<string, unknown>,
         },
         client,
+        agency: {
+          name: user.agencyName,
+          website: user.agencyWebsite,
+          logoUrl: user.agencyLogoUrl,
+          brandColor: user.agencyBrandColor,
+        },
+        whiteLabel: plan === "pro",
       })
     );
 

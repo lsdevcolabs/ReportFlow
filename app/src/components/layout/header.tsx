@@ -60,9 +60,9 @@ export function Header({ user }: HeaderProps) {
                   <a href="/settings">Settings</a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:text-destructive">
+                <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
-                  Sign out
+                  <a href="/api/auth/signout">Sign out</a>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -24,12 +25,32 @@ const secondaryNavigation = [
   { name: "Upgrade", href: "/upgrade", icon: CreditCard },
 ];
 
-interface SidebarProps {
-  plan?: string;
-}
+const PLAN_LABELS: Record<string, string> = {
+  free: "Free",
+  starter: "Starter",
+  pro: "Pro",
+};
 
-export function Sidebar({ plan = "free" }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname();
+  const [plan, setPlan] = useState("free");
+
+  useEffect(() => {
+    async function fetchPlan() {
+      try {
+        const res = await fetch("/api/user");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user?.plan) {
+            setPlan(data.user.plan);
+          }
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+    fetchPlan();
+  }, [pathname]); // Re-fetch when navigating to catch plan updates
 
   return (
     <div className="fixed inset-y-0 z-50 flex w-64 flex-col bg-card border-r">
@@ -92,9 +113,17 @@ export function Sidebar({ plan = "free" }: SidebarProps) {
 
       {/* Footer / Plan Badge */}
       <div className="shrink-0 border-t p-4">
-        <div className="rounded-lg bg-muted/50 p-3">
+        <div className={cn(
+          "rounded-lg p-3",
+          plan !== "free" ? "bg-primary/10" : "bg-muted/50"
+        )}>
           <p className="text-xs font-medium text-muted-foreground">Current Plan</p>
-          <p className="text-sm font-semibold capitalize">{plan}</p>
+          <p className={cn(
+            "text-sm font-semibold capitalize",
+            plan !== "free" && "text-primary"
+          )}>
+            {PLAN_LABELS[plan] || "Free"}
+          </p>
         </div>
       </div>
     </div>

@@ -84,10 +84,19 @@ export default function ClientsClient({ initialClients, maxClients, plan }: Clie
   const handleAddClient = async (data: ClientFormData) => {
     setLoading(true);
     try {
+      let logoData: string | undefined;
+      if (data.logoFile) {
+        logoData = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(data.logoFile!);
+        });
+      }
+
       const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, logoData }),
       });
 
       if (res.ok) {
@@ -99,10 +108,15 @@ export default function ClientsClient({ initialClients, maxClients, plan }: Clie
         if (error.error === "LIMIT_EXCEEDED") {
           setIsFormOpen(false);
           setIsLimitDialogOpen(true);
+          throw new Error("Limit exceeded");
+        } else {
+          alert(`Failed to add client: ${error.message || error.error || "Unknown error"}`);
+          throw new Error(error.message || "Failed to add client");
         }
       }
     } catch (e) {
       console.error("Failed to add client", e);
+      throw e;
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
@@ -20,8 +21,7 @@ function base64ToBuffer(base64: string): Buffer {
 
 async function getAuthUserId(): Promise<string | null> {
   try {
-    const { auth } = await import("@clerk/nextjs");
-    const { userId } = auth();
+    const { userId } = await auth();
     return userId;
   } catch {
     return null;

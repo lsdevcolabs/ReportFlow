@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { reports, clients } from "@/lib/db/schema";
+import { reports, clients, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { canUseWhiteLabel } from "@/lib/plans";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(
   req: NextRequest,
@@ -26,9 +29,17 @@ export async function GET(
           logoUrl: clients.logoUrl,
           brandColor: clients.brandColor,
         },
+        user: {
+          plan: users.plan,
+          agencyName: users.agencyName,
+          agencyWebsite: users.agencyWebsite,
+          agencyLogoUrl: users.agencyLogoUrl,
+          agencyBrandColor: users.agencyBrandColor,
+        },
       })
       .from(reports)
       .innerJoin(clients, eq(reports.clientId, clients.id))
+      .innerJoin(users, eq(reports.userId, users.id))
       .where(
         and(
           eq(reports.shareToken, shareToken),
@@ -44,7 +55,9 @@ export async function GET(
       );
     }
 
-    const { report, client } = result[0];
+    const { report, client, user } = result[0];
+    const plan = user.plan as "free" | "starter" | "pro";
+    const whiteLabel = canUseWhiteLabel(plan);
 
     return NextResponse.json({
       report: {
@@ -57,6 +70,13 @@ export async function GET(
         isPublic: report.isPublic,
         metricsData: report.metricsData as Record<string, unknown>,
         client,
+        agency: {
+          name: user.agencyName,
+          website: user.agencyWebsite,
+          logoUrl: user.agencyLogoUrl,
+          brandColor: user.agencyBrandColor,
+          whiteLabel,
+        },
       },
     });
   } catch (error) {

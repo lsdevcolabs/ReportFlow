@@ -7,8 +7,16 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 function getDb() {
   if (!_db && process.env.DATABASE_URL) {
-    const sql = neon(process.env.DATABASE_URL);
-    _db = drizzle(sql, { schema });
+    if (process.env.DATABASE_URL.includes("...")) {
+      return null;
+    }
+    try {
+      const sql = neon(process.env.DATABASE_URL);
+      _db = drizzle(sql, { schema });
+    } catch (e) {
+      console.error("Failed to initialize database:", e);
+      return null;
+    }
   }
   return _db;
 }
@@ -17,9 +25,9 @@ export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(_, prop) {
     const actualDb = getDb();
     if (!actualDb) {
-      throw new Error("Database not initialized. Set DATABASE_URL environment variable.");
+      throw new Error("Database not configured. Please add a valid DATABASE_URL to your .env.local file.");
     }
-    return (actualDb as any)[prop];
+    return (actualDb as unknown as Record<string | symbol, unknown>)[prop];
   }
 });
 
