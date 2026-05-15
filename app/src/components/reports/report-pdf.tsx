@@ -385,7 +385,7 @@ export function ReportPDFDocument({ report, client, agency, whiteLabel }: Report
           ) : (
             <>
               <Text style={styles.footerText}>Generated with ReportFlow</Text>
-              <Text style={styles.poweredBy}>reportflow.app</Text>
+              <Text style={styles.poweredBy}>reportflow-two.vercel.app</Text>
             </>
           )}
         </View>
