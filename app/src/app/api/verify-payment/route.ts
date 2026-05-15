@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-
 export const dynamic = "force-dynamic";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-const LEMONSQUEEZY_API_KEY = process.env.LEMONSQUEEZY_API_KEY || "";
+const DODO_API_KEY = process.env.DODO_PAYMENTS_API_KEY || "";
+const DODO_ENVIRONMENT = process.env.NODE_ENV === "development" ? "test_mode" : "live_mode";
 
 /**
  * POST /api/verify-payment
- * Checks the Lemon Squeezy API for subscriptions matching the user's email,
+ * Checks the Dodo Payments API for payments and subscriptions matching the user's email,
  * and updates the plan in the database accordingly.
- * This is needed because LS webhooks can't reach localhost during development.
+ * This is needed because Dodo Payments webhooks can't reach localhost during development.
  */
 export async function POST() {
   try {
@@ -26,17 +26,17 @@ export async function POST() {
       return NextResponse.json({ error: "No email found" }, { status: 400 });
     }
 
-    if (!LEMONSQUEEZY_API_KEY || LEMONSQUEEZY_API_KEY === "...") {
-      return NextResponse.json({ error: "Lemon Squeezy not configured" }, { status: 500 });
+    if (!DODO_API_KEY || DODO_API_KEY === "...") {
+      return NextResponse.json({ error: "Dodo Payments not configured" }, { status: 500 });
     }
 
-    // Step 1: Find customer by email
+    // Step 1: Try to find customer by email using Dodo Payments API
     const customerRes = await fetch(
-      `https://api.lemonsqueezy.com/v1/customers?filter[email]=${encodeURIComponent(email)}`,
+      `https://${DODO_ENVIRONMENT === 'test_mode' ? 'test.' : ''}dodopayments.com/customers?email=${encodeURIComponent(email)}`,
       {
         headers: {
-          Authorization: `Bearer ${LEMONSQUEEZY_API_KEY}`,
-          Accept: "application/vnd.api+json",
+          "Authorization": `Bearer ${DODO_API_KEY}`,
+          "Content-Type": "application/json",
         },
       }
     );
@@ -53,18 +53,19 @@ export async function POST() {
       return NextResponse.json({ 
         updated: false, 
         plan: "free",
-        message: "No Lemon Squeezy customer found for this email" 
+        message: "No Dodo Payments customer found for this email" 
       });
     }
 
-    // Step 2: Find subscriptions for this customer
     const customerId = customers[0].id;
+
+    // Step 2: Find subscriptions for this customer
     const subRes = await fetch(
-      `https://api.lemonsqueezy.com/v1/subscriptions?filter[customer_id]=${customerId}`,
+      `https://${DODO_ENVIRONMENT === 'test_mode' ? 'test.' : ''}dodopayments.com/subscriptions?customer_id=${customerId}`,
       {
         headers: {
-          Authorization: `Bearer ${LEMONSQUEEZY_API_KEY}`,
-          Accept: "application/vnd.api+json",
+          "Authorization": `Bearer ${DODO_API_KEY}`,
+          "Content-Type": "application/json",
         },
       }
     );
@@ -94,6 +95,7 @@ export async function POST() {
     const productName = activeSub.attributes.product_name?.toLowerCase() || "";
     const variantName = activeSub.attributes.variant_name?.toLowerCase() || "";
     const subscriptionId = activeSub.id;
+    const paymentId = activeSub.attributes.payment?.id;
     
     // Determine plan from product/variant name
     let plan = "free";
@@ -103,7 +105,7 @@ export async function POST() {
       plan = "starter";
     } else if (status === "active" || status === "trialing") {
       // If we can't determine the plan from name, check price
-      const price = activeSub.attributes.first_subscription_item?.price || 0;
+      const price = activeSub.attributes.price || 0;
       if (price >= 2900) {
         plan = "pro";
       } else if (price >= 900) {
@@ -111,7 +113,7 @@ export async function POST() {
       }
     }
 
-    // Map LS status to our status
+    // Map Dodo status to our status
     const statusMap: Record<string, string> = {
       active: "active",
       trialing: "active",
@@ -119,6 +121,8 @@ export async function POST() {
       unpaid: "past_due",
       cancelled: "cancelled",
       expired: "cancelled",
+      on_hold: "inactive",
+      failed: "past_due",
       paused: "inactive",
     };
     const subscriptionStatus = statusMap[status] || "inactive";
@@ -133,8 +137,9 @@ export async function POST() {
       .update(users)
       .set({
         plan,
-        lsCustomerId: customerId,
-        lsSubscriptionId: subscriptionId,
+        dodoCustomerId: customerId,
+        dodoSubscriptionId: subscriptionId,
+        dodoPaymentId: paymentId,
         subscriptionStatus,
         updatedAt: new Date(),
       })

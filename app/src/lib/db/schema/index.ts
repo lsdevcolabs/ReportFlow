@@ -14,8 +14,9 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name"),
   plan: text("plan").notNull().default("free"), // 'free' | 'starter' | 'pro'
-  lsCustomerId: text("ls_customer_id"), // Lemon Squeezy customer ID
-  lsSubscriptionId: text("ls_subscription_id"), // Lemon Squeezy subscription ID
+  dodoCustomerId: text("dodo_customer_id"), // Dodo Payments customer ID
+  dodoSubscriptionId: text("dodo_subscription_id"), // Dodo Payments subscription ID
+  dodoPaymentId: text("dodo_payment_id"), // Dodo Payments payment ID
   subscriptionStatus: text("subscription_status").default("inactive"), // 'active' | 'past_due' | 'cancelled' | 'inactive'
   agencyName: text("agency_name"),
   agencyWebsite: text("agency_website"),
