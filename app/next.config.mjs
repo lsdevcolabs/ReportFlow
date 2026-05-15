@@ -53,7 +53,7 @@ export default withSentryConfig(nextConfig, {
   silent: true,
   webpack: {
     autoInstrumentServerFunctions: true,
-    autoInstrumentMiddleware: true,
+    autoInstrumentMiddleware: false,
     autoInstrumentAppDirectory: true,
   },
 });
