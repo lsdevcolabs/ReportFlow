@@ -90,7 +90,8 @@ export default function ChoosePlanClient() {
       if (data.checkoutUrl) {
         window.location.assign(data.checkoutUrl);
       } else {
-        alert("Failed to create checkout. Please try again.");
+        const message = data.error || "Failed to create checkout. Please try again.";
+        alert(message);
       }
     } catch {
       alert("Failed to create checkout. Please try again.");

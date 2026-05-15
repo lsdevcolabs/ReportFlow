@@ -28,8 +28,11 @@ export async function POST(req: NextRequest) {
 
     const userId = clerkUser.id;
 
-    if (!process.env.DATABASE_URL || !DODO_API_KEY) {
-      return NextResponse.json({ error: "Service not configured" }, { status: 500 });
+    if (!process.env.DATABASE_URL || !DODO_API_KEY || DODO_API_KEY === "your_api_key_here") {
+      return NextResponse.json({ 
+        error: "Payment service not configured. Please contact support.",
+        notConfigured: true
+      }, { status: 500 });
     }
 
     // Ensure user exists in database
