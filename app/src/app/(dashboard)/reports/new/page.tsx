@@ -214,17 +214,104 @@ function NewReportPageContent() {
         return;
       }
       
-      const headers = lines[0].split(',').map(h => h.trim());
-      const values = lines[1].split(',').map(v => v.trim());
+      const parseCsvLine = (text: string) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          if (char === '"' && text[i+1] === '"') {
+            current += '"';
+            i++; 
+          } else if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current);
+        return result.map(s => s.trim());
+      };
+
+      const cleanValue = (val: string) => {
+        const cleaned = val.replace(/[$,%]/g, '');
+        return parseFloat(cleaned);
+      };
+
+      const metricKeyMapping: Record<string, keyof ReportFormData> = {
+        "organic traffic": "organicTraffic",
+        "previous period organic": "previousOrganicTraffic",
+        "paid traffic": "paidTraffic",
+        "total conversions": "conversions",
+        "conversion rate (%)": "conversionRate",
+        "previous period conversions": "previousConversions",
+        "ad spend ($)": "spend",
+        "roas": "roas",
+        "impressions": "impressions",
+        "clicks": "clicks",
+        "ctr (%)": "ctr",
+        "social followers": "socialFollowers",
+        "social engagement (%)": "socialEngagement",
+        "email subscribers": "emailSubscribers",
+        "email open rate (%)": "emailOpenRate"
+      };
+
+      let parsedHeaders: string[] = [];
+      let parsedValues: string[] = [];
+
+      const firstLineParts = parseCsvLine(lines[0].toLowerCase());
+      if (firstLineParts.includes("metric") && firstLineParts.includes("value")) {
+        // Vertical format
+        for (let i = 1; i < lines.length; i++) {
+          const parts = parseCsvLine(lines[i]);
+          if (parts.length >= 2) {
+            parsedHeaders.push(parts[0]);
+            parsedValues.push(parts[1]);
+          }
+        }
+      } else {
+        // Horizontal format
+        parsedHeaders = parseCsvLine(lines[0]);
+        parsedValues = parseCsvLine(lines[1]);
+      }
       
       const newData = { ...formData };
       let updated = false;
 
-      headers.forEach((header, index) => {
-        const val = parseFloat(values[index]);
-        if (!isNaN(val) && header in newData) {
-          (newData as any)[header] = val;
+      parsedHeaders.forEach((rawHeader, index) => {
+        const headerLower = rawHeader.toLowerCase();
+        let key = metricKeyMapping[headerLower] as keyof ReportFormData | undefined;
+        
+        if (!key && Object.keys(newData).includes(rawHeader)) {
+          key = rawHeader as keyof ReportFormData;
+        }
+
+        if (key && parsedValues[index] !== undefined) {
+          const valStr = parsedValues[index];
+          const val = cleanValue(valStr);
+          if (!isNaN(val)) {
+            (newData as any)[key] = val;
+            updated = true;
+          }
+        } else if (headerLower === "report title" && parsedValues[index]) {
+          newData.title = parsedValues[index];
           updated = true;
+        } else if (headerLower === "start date" && parsedValues[index]) {
+          // ensure valid date string before setting
+          const d = new Date(parsedValues[index]);
+          if (!isNaN(d.getTime())) {
+            newData.dateRangeStart = d.toISOString().split("T")[0];
+            updated = true;
+          }
+        } else if (headerLower === "end date" && parsedValues[index]) {
+          const d = new Date(parsedValues[index]);
+          if (!isNaN(d.getTime())) {
+            newData.dateRangeEnd = d.toISOString().split("T")[0];
+            updated = true;
+          }
         }
       });
       
@@ -232,7 +319,7 @@ function NewReportPageContent() {
         setFormData(newData);
         alert("CSV data imported successfully!");
       } else {
-        alert("No matching metrics found in the CSV. Make sure your headers match the metric names (e.g., organicTraffic, spend, conversions).");
+        alert("No matching metrics found in the CSV. Make sure your headers match the metric names.");
       }
     };
     reader.readAsText(file);
