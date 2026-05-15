@@ -305,20 +305,26 @@ export function ReportPDFDocument({ report, client, agency, whiteLabel }: Report
               <View style={styles.kpiCard}>
                 <Text style={styles.kpiLabel}>Total Sessions</Text>
                 <Text style={styles.kpiValue}>{formatNumber(metricsData.summary.sessions)}</Text>
-                {metricsData.summary.previousSessions && (
-                  <Text style={styles.kpiChange}>
-                    +{calculateChange(metricsData.summary.sessions, metricsData.summary.previousSessions).toFixed(1)}% vs previous
-                  </Text>
-                )}
+                {metricsData.summary.previousSessions !== undefined && (() => {
+                  const change = calculateChange(metricsData.summary.sessions, metricsData.summary.previousSessions!);
+                  return (
+                    <Text style={change >= 0 ? styles.kpiChange : styles.kpiChangeNegative}>
+                      {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs previous
+                    </Text>
+                  );
+                })()}
               </View>
               <View style={styles.kpiCard}>
                 <Text style={styles.kpiLabel}>Conversions</Text>
                 <Text style={styles.kpiValue}>{formatNumber(metricsData.summary.conversions)}</Text>
-                {metricsData.summary.previousConversions && (
-                  <Text style={styles.kpiChange}>
-                    +{calculateChange(metricsData.summary.conversions, metricsData.summary.previousConversions).toFixed(1)}% vs previous
-                  </Text>
-                )}
+                {metricsData.summary.previousConversions !== undefined && (() => {
+                  const change = calculateChange(metricsData.summary.conversions, metricsData.summary.previousConversions!);
+                  return (
+                    <Text style={change >= 0 ? styles.kpiChange : styles.kpiChangeNegative}>
+                      {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs previous
+                    </Text>
+                  );
+                })()}
               </View>
               {metricsData.summary.revenue !== undefined && (
                 <View style={styles.kpiCard}>

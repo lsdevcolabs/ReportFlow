@@ -342,22 +342,28 @@ export default function ReportDetailPage() {
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">Total Sessions</p>
               <p className="text-2xl font-bold">{formatNumber(metricsData.summary.sessions)}</p>
-              {metricsData.summary.previousSessions && (
-                <p className="text-xs text-green-600">
-                  +{Math.round(((metricsData.summary.sessions - metricsData.summary.previousSessions) / metricsData.summary.previousSessions) * 100)}% vs prev
-                </p>
-              )}
+              {metricsData.summary.previousSessions && (() => {
+                const change = ((metricsData.summary.sessions - metricsData.summary.previousSessions) / metricsData.summary.previousSessions) * 100;
+                return (
+                  <p className={`text-xs ${change >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs prev
+                  </p>
+                );
+              })()}
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">Conversions</p>
               <p className="text-2xl font-bold">{formatNumber(metricsData.summary.conversions)}</p>
-              {metricsData.summary.previousConversions && (
-                <p className="text-xs text-green-600">
-                  +{Math.round(((metricsData.summary.conversions - metricsData.summary.previousConversions) / metricsData.summary.previousConversions) * 100)}% vs prev
-                </p>
-              )}
+              {metricsData.summary.previousConversions && (() => {
+                const change = ((metricsData.summary.conversions - metricsData.summary.previousConversions) / metricsData.summary.previousConversions) * 100;
+                return (
+                  <p className={`text-xs ${change >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs prev
+                  </p>
+                );
+              })()}
             </CardContent>
           </Card>
           {metricsData.summary.revenue !== undefined && (
