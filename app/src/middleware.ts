@@ -1,10 +1,19 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)", "/choose-plan(.*)", "/r(.*)"]);
 
 export default clerkMiddleware((auth, request) => {
-  if (!isPublicRoute(request)) {
-    auth().protect();
+  try {
+    if (!isPublicRoute(request)) {
+      auth().protect();
+    }
+  } catch {
+    // If Clerk is not configured (missing env vars), allow public routes
+    // Protected routes will return 401 by downstream page checks
+    if (!isPublicRoute(request)) {
+      return NextResponse.redirect(new URL("/sign-in", request.url));
+    }
   }
 });
 

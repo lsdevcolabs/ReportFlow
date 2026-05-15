@@ -1,6 +1,7 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Optimize image handling
   images: {
     remotePatterns: [
       {
@@ -14,7 +15,6 @@ const nextConfig = {
     ],
   },
 
-  // Speed up dev server by skipping lint/typecheck on each nav
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -22,14 +22,12 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
-  // Reduce unnecessary logging
   logging: {
     fetches: {
       fullUrl: false,
     },
   },
 
-  // Experimental optimizations for faster page transitions
   experimental: {
     optimizePackageImports: [
       "lucide-react",
@@ -51,4 +49,11 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  webpack: {
+    autoInstrumentServerFunctions: true,
+    autoInstrumentMiddleware: true,
+    autoInstrumentAppDirectory: true,
+  },
+});
