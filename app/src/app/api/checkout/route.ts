@@ -17,32 +17,6 @@ interface DodoCheckoutResponse {
   payment_id?: string;
 }
 
-/**
- * If the product config value is a full checkout URL
- * (e.g. https://test.checkout.dodopayments.com/buy/pdt_xxx?quantity=1),
- * extract the base URL and append user metadata as query params.
- */
-function buildDirectCheckoutUrl(
-  productValue: string,
-  email: string,
-  name: string,
-  userId: string,
-  appUrl: string
-): string {
-  try {
-    // Strip existing query params and rebuild cleanly
-    const base = productValue.split("?")[0];
-    const url = new URL(base);
-    url.searchParams.set("email", email);
-    url.searchParams.set("fullName", name);
-    url.searchParams.set("redirect_url", `${appUrl}/dashboard`);
-    url.searchParams.set("metadata_user_id", userId);
-    return url.toString();
-  } catch {
-    return productValue;
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const clerkUser = await currentUser();
@@ -79,26 +53,16 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://reportflow-two.vercel.app";
     const userName = user.name || user.email.split("@")[0];
 
-    // ──────────────────────────────────────────────────────────────────
-    // CASE 1: Product value is a full Dodo checkout URL
-    // e.g. https://test.checkout.dodopayments.com/buy/pdt_xxx
-    // Just redirect to it directly with user metadata — no API call needed.
-    // ──────────────────────────────────────────────────────────────────
-    if (productValue.startsWith("http")) {
-      const checkoutUrl = buildDirectCheckoutUrl(
-        productValue,
-        user.email,
-        userName,
-        userId,
-        appUrl
-      );
-      console.log(`[POST /api/checkout] Direct URL checkout for plan=${plan}`);
-      return NextResponse.json({ checkoutUrl });
+    // Extract product ID if productValue is a URL
+    let productId = productValue;
+    if (productValue.includes("/buy/")) {
+      productId = productValue.split("/buy/")[1].split("?")[0];
+    } else if (productValue.startsWith("http")) {
+      // Fallback if URL is different but we still need an ID (though unlikely for Dodo)
+      const url = new URL(productValue);
+      productId = url.pathname.split("/").pop() || productValue;
     }
 
-    // ──────────────────────────────────────────────────────────────────
-    // CASE 2: Product value is a bare product ID — use the Dodo API
-    // ──────────────────────────────────────────────────────────────────
     if (!DODO_API_KEY || DODO_API_KEY === "your_api_key_here") {
       return NextResponse.json(
         { error: "Payment API key not configured. Please contact support." },
@@ -108,13 +72,16 @@ export async function POST(req: NextRequest) {
 
     // Determine environment: test if API key starts with test prefix or has "test" in it
     const isTestKey = DODO_API_KEY.toLowerCase().includes("test") || 
-                      process.env.NODE_ENV === "development";
-    const baseUrl = isTestKey
+                      process.env.NODE_ENV === "development" ||
+                      productId.includes("test"); // sometimes ID might give a hint
+    
+    // As per documentation, test environment API is test.dodopayments.com
+    const baseUrl = isTestKey || DODO_API_KEY.startsWith("test_") 
       ? "https://test.dodopayments.com"
-      : "https://dodopayments.com";
+      : "https://live.dodopayments.com";
 
     const checkoutPayload = {
-      product_cart: [{ product_id: productValue, quantity: 1 }],
+      product_cart: [{ product_id: productId, quantity: 1 }],
       customer: { email: user.email, name: userName },
       return_url: `${appUrl}/dashboard`,
       metadata: { user_id: userId },
@@ -131,10 +98,10 @@ export async function POST(req: NextRequest) {
 
     if (!dodoResponse.ok) {
       const errorData = await dodoResponse.text();
-      console.error("[POST /api/checkout] Dodo API error:", errorData);
+      console.error("[POST /api/checkout] Dodo API error:", dodoResponse.status, errorData);
 
-      // Fallback: build a direct checkout URL using the product ID
-      const fallbackUrl = `${isTestKey ? "https://test.checkout.dodopayments.com" : "https://checkout.dodopayments.com"}/buy/${productValue}?email=${encodeURIComponent(user.email)}&fullName=${encodeURIComponent(userName)}&redirect_url=${encodeURIComponent(appUrl + "/dashboard")}&metadata_user_id=${userId}`;
+      // We still use a direct fallback just in case the API is down
+      const fallbackUrl = `${isTestKey ? "https://test.checkout.dodopayments.com" : "https://checkout.dodopayments.com"}/buy/${productId}?quantity=1&email=${encodeURIComponent(user.email)}&customer_name=${encodeURIComponent(userName)}&redirect_url=${encodeURIComponent(appUrl + "/dashboard")}&metadata_user_id=${userId}`;
       return NextResponse.json({
         checkoutUrl: fallbackUrl,
         warning: "API call failed, used direct link fallback.",
