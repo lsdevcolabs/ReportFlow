@@ -6,7 +6,6 @@ import { eq, desc } from "drizzle-orm";
 import { getMaxClients } from "@/lib/plans";
 import ClientsClient from "./clients-client";
 
-// Allow Next.js to revalidate every 15 seconds instead of force-dynamic
 export const revalidate = 15;
 
 interface SearchParams {
@@ -18,10 +17,21 @@ interface PageProps {
 }
 
 export default async function ClientsPage({ searchParams }: PageProps) {
-  const { userId } = await auth();
-  
+  let userId: string | null = null;
+  try {
+    const authResult = await auth();
+    userId = authResult?.userId ?? null;
+  } catch {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold mb-2">Authentication error</h1>
+        <p className="text-muted-foreground">Please try signing in again.</p>
+      </div>
+    );
+  }
+
   if (!userId) {
-    return <div>Please sign in to view clients.</div>;
+    return <div className="p-8">Please sign in to view clients.</div>;
   }
 
   let plan = "free";
@@ -33,7 +43,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     plan = user?.plan || "free";
     maxClients = getMaxClients(plan as "free" | "starter" | "pro");
 
-    if (process.env.DATABASE_URL) {
+    if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("...")) {
       userClients = await db
         .select()
         .from(clients)

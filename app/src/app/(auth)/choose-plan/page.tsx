@@ -5,22 +5,36 @@ import ChoosePlanClient from "./choose-plan-client";
 export const dynamic = "force-dynamic";
 
 export default async function ChoosePlanPage() {
-  const { userId } = await auth();
-  const clerkUser = await currentUser();
+  let userId: string | null = null;
+  let clerkUser: any = null;
+
+  try {
+    const authResult = await auth();
+    userId = authResult?.userId ?? null;
+    clerkUser = await currentUser();
+  } catch {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
+          <p className="text-muted-foreground">Please try signing in again.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!userId || !clerkUser) {
     return null;
   }
 
   try {
-    if (process.env.DATABASE_URL) {
+    if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("...")) {
       const email = clerkUser.emailAddresses[0]?.emailAddress;
       const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim();
-
       await ensureUserExists(userId, email, name);
     }
   } catch (error) {
-    console.error("[ChoosePlanPage] Error:", error);
+    console.error("[ChoosePlanPage] DB Error:", error);
   }
 
   return (

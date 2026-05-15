@@ -5,16 +5,26 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { clients, reports } from "@/lib/db/schema";
-import { eq, count, and, gte, sql } from "drizzle-orm";
+import { eq, count, sql } from "drizzle-orm";
 
-// Allow Next.js to cache and revalidate every 30 seconds instead of force-dynamic
 export const revalidate = 30;
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
+  let userId: string | null = null;
+  try {
+    const authResult = await auth();
+    userId = authResult?.userId ?? null;
+  } catch {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold mb-2">Authentication error</h1>
+        <p className="text-muted-foreground">Please try signing in again.</p>
+      </div>
+    );
+  }
 
   if (!userId) {
-    return <div>Please sign in to view your dashboard.</div>;
+    return <div className="p-8">Please sign in to view your dashboard.</div>;
   }
 
   let totalClients = 0;
@@ -28,7 +38,6 @@ export default async function DashboardPage() {
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      // Single parallel fetch instead of 4 sequential queries
       const [clientsResult, reportsResult] = await Promise.all([
         db.select({ count: count() }).from(clients).where(eq(clients.userId, userId)),
         db.select({
@@ -62,7 +71,6 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -109,7 +117,6 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Getting Started */}
       <Card>
         <CardHeader>
           <CardTitle>Getting Started</CardTitle>

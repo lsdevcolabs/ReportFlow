@@ -12,7 +12,18 @@ interface PageProps {
 }
 
 export default async function ClientDetailPage({ params }: PageProps) {
-  const { userId } = await auth();
+  let userId: string | null = null;
+  try {
+    const authResult = await auth();
+    userId = authResult?.userId ?? null;
+  } catch {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold mb-2">Authentication error</h1>
+        <p className="text-muted-foreground">Please try signing in again.</p>
+      </div>
+    );
+  }
 
   if (!userId) {
     redirect("/sign-in");
@@ -21,26 +32,34 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const { id } = await params;
 
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("...")) {
-    return <div>Database not configured.</div>;
+    return <div className="p-8">Database not configured.</div>;
   }
 
-  // Fetch client
-  const [client] = await db
-    .select()
-    .from(clients)
-    .where(and(eq(clients.id, id), eq(clients.userId, userId)))
-    .limit(1);
+  let client: any = null;
+  let clientReports: any[] = [];
+
+  try {
+    const [foundClient] = await db
+      .select()
+      .from(clients)
+      .where(and(eq(clients.id, id), eq(clients.userId, userId)))
+      .limit(1);
+    client = foundClient;
+
+    if (client) {
+      clientReports = await db
+        .select()
+        .from(reports)
+        .where(and(eq(reports.clientId, id), eq(reports.userId, userId)))
+        .orderBy(desc(reports.createdAt));
+    }
+  } catch (error) {
+    console.error("Client detail DB error:", error);
+  }
 
   if (!client) {
-    return <div className="p-8">Client not found or you don't have access.</div>;
+    return <div className="p-8">Client not found or you don&apos;t have access.</div>;
   }
-
-  // Fetch related reports
-  const clientReports = await db
-    .select()
-    .from(reports)
-    .where(and(eq(reports.clientId, id), eq(reports.userId, userId)))
-    .orderBy(desc(reports.createdAt));
 
   return <ClientDetailClient initialClient={client} initialReports={clientReports} />;
 }

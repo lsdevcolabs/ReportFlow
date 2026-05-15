@@ -6,7 +6,6 @@ import { eq, desc } from "drizzle-orm";
 import { getMaxReports } from "@/lib/plans";
 import ReportsClient from "./reports-client";
 
-// Allow Next.js to revalidate every 15 seconds instead of force-dynamic
 export const revalidate = 15;
 
 interface PageProps {
@@ -14,10 +13,21 @@ interface PageProps {
 }
 
 export default async function ReportsPage({ searchParams }: PageProps) {
-  const { userId } = await auth();
+  let userId: string | null = null;
+  try {
+    const authResult = await auth();
+    userId = authResult?.userId ?? null;
+  } catch {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold mb-2">Authentication error</h1>
+        <p className="text-muted-foreground">Please try signing in again.</p>
+      </div>
+    );
+  }
 
   if (!userId) {
-    return <div>Please sign in to view reports.</div>;
+    return <div className="p-8">Please sign in to view reports.</div>;
   }
 
   await searchParams;
@@ -41,7 +51,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         .leftJoin(clients, eq(reports.clientId, clients.id))
         .where(eq(reports.userId, userId))
         .orderBy(desc(reports.createdAt));
-        
+
       userReports = rawReports.map((row) => ({
         ...row.report,
         client: row.client ? { name: row.client.name, brandColor: row.client.brandColor } : undefined,
