@@ -1,40 +1,33 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { ensureUserExists } from "@/lib/auth";
 import ChoosePlanClient from "./choose-plan-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChoosePlanPage() {
-  let userId: string | null = null;
-  let clerkUser: any = null;
-
+  // Attempt to get the current user — right after signup Clerk's session
+  // can take a moment to propagate on the server, so we treat auth errors
+  // as non-fatal and always render the plan-selection UI.
   try {
-    const authResult = await auth();
-    userId = authResult?.userId ?? null;
-    clerkUser = await currentUser();
-  } catch {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
-          <p className="text-muted-foreground">Please try signing in again.</p>
-        </div>
-      </div>
-    );
-  }
+    const clerkUser = await currentUser();
 
-  if (!userId || !clerkUser) {
-    return null;
-  }
-
-  try {
-    if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("...")) {
-      const email = clerkUser.emailAddresses[0]?.emailAddress;
-      const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim();
-      await ensureUserExists(userId, email, name);
+    if (clerkUser) {
+      // Best-effort: create the DB record for this user if it doesn't exist yet.
+      // Errors here must NOT block the page from rendering.
+      try {
+        if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes("...")) {
+          const email = clerkUser.emailAddresses[0]?.emailAddress;
+          const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim();
+          await ensureUserExists(clerkUser.id, email, name);
+        }
+      } catch (dbError) {
+        console.error("[ChoosePlanPage] DB Error (non-fatal):", dbError);
+      }
     }
-  } catch (error) {
-    console.error("[ChoosePlanPage] DB Error:", error);
+  } catch (authError) {
+    // Clerk session not yet available on the server right after signup — this is
+    // expected. Log it but still render the page so the user isn't blocked.
+    console.warn("[ChoosePlanPage] Auth not ready yet (non-fatal):", authError);
   }
 
   return (

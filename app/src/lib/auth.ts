@@ -60,16 +60,12 @@ export async function getUserById(userId: string) {
 export async function updateUserPlan(
   userId: string,
   plan: "free" | "starter" | "pro",
-  lsCustomerId?: string,
-  lsSubscriptionId?: string,
   subscriptionStatus: "active" | "past_due" | "cancelled" | "inactive" = "active"
 ) {
   const [updatedUser] = await db
     .update(users)
     .set({
       plan,
-      lsCustomerId: lsCustomerId || null,
-      lsSubscriptionId: lsSubscriptionId || null,
       subscriptionStatus,
       updatedAt: new Date(),
     })
