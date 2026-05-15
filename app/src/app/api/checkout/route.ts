@@ -34,8 +34,8 @@ function buildDirectCheckoutUrl(
     const url = new URL(base);
     url.searchParams.set("email", email);
     url.searchParams.set("fullName", name);
-    url.searchParams.set("redirectUrl", `${appUrl}/dashboard`);
-    url.searchParams.set("metadata[user_id]", userId);
+    url.searchParams.set("redirect_url", `${appUrl}/dashboard`);
+    url.searchParams.set("metadata_user_id", userId);
     return url.toString();
   } catch {
     return productValue;
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
       console.error("[POST /api/checkout] Dodo API error:", errorData);
 
       // Fallback: build a direct checkout URL using the product ID
-      const fallbackUrl = `${isTestKey ? "https://test.checkout.dodopayments.com" : "https://checkout.dodopayments.com"}/buy/${productValue}?email=${encodeURIComponent(user.email)}&fullName=${encodeURIComponent(userName)}&redirectUrl=${encodeURIComponent(appUrl + "/dashboard")}&metadata[user_id]=${userId}`;
+      const fallbackUrl = `${isTestKey ? "https://test.checkout.dodopayments.com" : "https://checkout.dodopayments.com"}/buy/${productValue}?email=${encodeURIComponent(user.email)}&fullName=${encodeURIComponent(userName)}&redirect_url=${encodeURIComponent(appUrl + "/dashboard")}&metadata_user_id=${userId}`;
       return NextResponse.json({
         checkoutUrl: fallbackUrl,
         warning: "API call failed, used direct link fallback.",
