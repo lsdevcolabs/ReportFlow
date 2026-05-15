@@ -120,7 +120,7 @@ export default function ClientDetailClient({ initialClient, initialReports }: Cl
             <Edit className="mr-2 h-4 w-4" />
             Edit
           </Button>
-          <Button variant="outline" className="text-destructive hover:text-destructive flex-1 sm:flex-none" onClick={() => setIsDeleteOpen(true)}>
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setIsDeleteOpen(true)}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </Button>
