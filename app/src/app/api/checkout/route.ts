@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-export const dynamic = "force-dynamic";
 import { currentUser } from "@clerk/nextjs/server";
 import { ensureUserExists } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 const DODO_API_KEY = process.env.DODO_PAYMENTS_API_KEY || "";
 
@@ -145,8 +146,8 @@ export async function POST(req: NextRequest) {
       checkoutUrl: checkoutData.checkout_url,
       paymentId: checkoutData.payment_id,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[POST /api/checkout]", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error", details: error?.message || String(error) }, { status: 500 });
   }
 }
