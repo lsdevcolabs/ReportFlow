@@ -10,6 +10,7 @@ import type { Plan } from "@/lib/plan-limits";
 import { ReportPDFDocument } from "@/components/reports/report-pdf";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(
   req: NextRequest,

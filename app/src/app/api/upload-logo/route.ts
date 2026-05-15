@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import { auth } from "@clerk/nextjs/server";
 import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";

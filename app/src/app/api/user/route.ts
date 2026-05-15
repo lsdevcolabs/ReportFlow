@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import { currentUser } from "@clerk/nextjs/server";
 import { ensureUserExists } from "@/lib/auth";
 import { getCurrentUserId } from "@/lib/clerk-auth";

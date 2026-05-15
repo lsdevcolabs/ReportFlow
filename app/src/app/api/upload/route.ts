@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import { getCurrentUserId } from "@/lib/clerk-auth";
 import Papa from "papaparse";
 import { z } from "zod";
