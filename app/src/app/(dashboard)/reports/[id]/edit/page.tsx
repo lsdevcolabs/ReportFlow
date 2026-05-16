@@ -166,8 +166,11 @@ function EditReportPageContent() {
         if (!valStr) return;
 
         let key = metricKeyMapping[header] as keyof ReportFormData | undefined;
-        if (!key && Object.keys(newData).includes(header)) {
-          key = header as keyof ReportFormData;
+        if (!key) {
+          const matchingKey = Object.keys(newData).find(k => k.toLowerCase() === header);
+          if (matchingKey) {
+            key = matchingKey as keyof ReportFormData;
+          }
         }
 
         if (key) {
