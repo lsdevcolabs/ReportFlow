@@ -136,9 +136,96 @@ function NewReportPageContent() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("traffic");
+  const [importedCsvData, setImportedCsvData] = useState<Record<string, string>[] | null>(null);
 
   const updateField = <K extends keyof ReportFormData>(field: K, value: ReportFormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const applyCsvDataForClient = (clientId: string, csvRows: Record<string, string>[]) => {
+    const selectedClient = clients.find((c) => c.id === clientId);
+    if (!selectedClient) return;
+
+    const clientName = selectedClient.name.toLowerCase();
+    const matchedRow = csvRows.find(
+      (row) =>
+        (row["client"] && row["client"].toLowerCase() === clientName) ||
+        (row["client name"] && row["client name"].toLowerCase() === clientName)
+    ) || (csvRows.length === 1 && !csvRows[0]["client"] && !csvRows[0]["client name"] ? csvRows[0] : null);
+
+    if (!matchedRow) {
+      alert(`No data found for client "${selectedClient.name}" in the uploaded CSV.`);
+      return;
+    }
+
+    const metricKeyMapping: Record<string, keyof ReportFormData> = {
+      "organic traffic": "organicTraffic",
+      "previous period organic": "previousOrganicTraffic",
+      "paid traffic": "paidTraffic",
+      "total conversions": "conversions",
+      "conversion rate (%)": "conversionRate",
+      "previous period conversions": "previousConversions",
+      "ad spend ($)": "spend",
+      "roas": "roas",
+      "impressions": "impressions",
+      "clicks": "clicks",
+      "ctr (%)": "ctr",
+      "social followers": "socialFollowers",
+      "social engagement (%)": "socialEngagement",
+      "email subscribers": "emailSubscribers",
+      "email open rate (%)": "emailOpenRate",
+    };
+
+    const cleanValue = (val: string) => {
+      const cleaned = val.replace(/[$,%]/g, "");
+      return parseFloat(cleaned);
+    };
+
+    setFormData((prev) => {
+      const newData = { ...prev, clientId };
+      let updated = false;
+
+      Object.keys(matchedRow).forEach((header) => {
+        const valStr = matchedRow[header];
+        if (!valStr) return;
+
+        let key = metricKeyMapping[header] as keyof ReportFormData | undefined;
+        if (!key && Object.keys(newData).includes(header)) {
+          key = header as keyof ReportFormData;
+        }
+
+        if (key) {
+          const val = cleanValue(valStr);
+          if (!isNaN(val)) {
+            (newData as any)[key] = val;
+            updated = true;
+          }
+        } else if (header === "report title" || header === "reporttitle" || header === "title") {
+          newData.title = valStr;
+          updated = true;
+        } else if (header === "start date" || header === "startdate") {
+          const d = new Date(valStr);
+          if (!isNaN(d.getTime())) {
+            newData.dateRangeStart = d.toISOString().split("T")[0];
+            updated = true;
+          }
+        } else if (header === "end date" || header === "enddate") {
+          const d = new Date(valStr);
+          if (!isNaN(d.getTime())) {
+            newData.dateRangeEnd = d.toISOString().split("T")[0];
+            updated = true;
+          }
+        }
+      });
+
+      if (updated) {
+        setTimeout(() => alert(`CSV data applied for client "${selectedClient.name}".`), 0);
+        return newData;
+      } else {
+        setTimeout(() => alert(`Data found for "${selectedClient.name}", but no valid metrics were recognized.`), 0);
+        return prev;
+      }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -236,90 +323,36 @@ function NewReportPageContent() {
         return result.map(s => s.trim());
       };
 
-      const cleanValue = (val: string) => {
-        const cleaned = val.replace(/[$,%]/g, '');
-        return parseFloat(cleaned);
-      };
-
-      const metricKeyMapping: Record<string, keyof ReportFormData> = {
-        "organic traffic": "organicTraffic",
-        "previous period organic": "previousOrganicTraffic",
-        "paid traffic": "paidTraffic",
-        "total conversions": "conversions",
-        "conversion rate (%)": "conversionRate",
-        "previous period conversions": "previousConversions",
-        "ad spend ($)": "spend",
-        "roas": "roas",
-        "impressions": "impressions",
-        "clicks": "clicks",
-        "ctr (%)": "ctr",
-        "social followers": "socialFollowers",
-        "social engagement (%)": "socialEngagement",
-        "email subscribers": "emailSubscribers",
-        "email open rate (%)": "emailOpenRate"
-      };
-
-      let parsedHeaders: string[] = [];
-      let parsedValues: string[] = [];
-
+      let rows: Record<string, string>[] = [];
       const firstLineParts = parseCsvLine(lines[0].toLowerCase());
       if (firstLineParts.includes("metric") && firstLineParts.includes("value")) {
         // Vertical format
+        const rowData: Record<string, string> = {};
         for (let i = 1; i < lines.length; i++) {
           const parts = parseCsvLine(lines[i]);
           if (parts.length >= 2) {
-            parsedHeaders.push(parts[0]);
-            parsedValues.push(parts[1]);
+            rowData[parts[0].toLowerCase()] = parts[1];
           }
         }
+        rows = [rowData];
       } else {
         // Horizontal format
-        parsedHeaders = parseCsvLine(lines[0]);
-        parsedValues = parseCsvLine(lines[1]);
+        const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+        for (let i = 1; i < lines.length; i++) {
+          const values = parseCsvLine(lines[i]);
+          const rowData: Record<string, string> = {};
+          headers.forEach((header, index) => {
+            rowData[header] = values[index] || "";
+          });
+          rows.push(rowData);
+        }
       }
       
-      const newData = { ...formData };
-      let updated = false;
-
-      parsedHeaders.forEach((rawHeader, index) => {
-        const headerLower = rawHeader.toLowerCase();
-        let key = metricKeyMapping[headerLower] as keyof ReportFormData | undefined;
-        
-        if (!key && Object.keys(newData).includes(rawHeader)) {
-          key = rawHeader as keyof ReportFormData;
-        }
-
-        if (key && parsedValues[index] !== undefined) {
-          const valStr = parsedValues[index];
-          const val = cleanValue(valStr);
-          if (!isNaN(val)) {
-            (newData as any)[key] = val;
-            updated = true;
-          }
-        } else if ((headerLower === "report title" || headerLower === "reporttitle" || headerLower === "title") && parsedValues[index]) {
-          newData.title = parsedValues[index];
-          updated = true;
-        } else if ((headerLower === "start date" || headerLower === "startdate") && parsedValues[index]) {
-          // ensure valid date string before setting
-          const d = new Date(parsedValues[index]);
-          if (!isNaN(d.getTime())) {
-            newData.dateRangeStart = d.toISOString().split("T")[0];
-            updated = true;
-          }
-        } else if ((headerLower === "end date" || headerLower === "enddate") && parsedValues[index]) {
-          const d = new Date(parsedValues[index]);
-          if (!isNaN(d.getTime())) {
-            newData.dateRangeEnd = d.toISOString().split("T")[0];
-            updated = true;
-          }
-        }
-      });
-      
-      if (updated) {
-        setFormData(newData);
-        alert("CSV data imported successfully!");
+      setImportedCsvData(rows);
+      if (formData.clientId) {
+        applyCsvDataForClient(formData.clientId, rows);
       } else {
-        alert("No matching metrics found in the CSV. Make sure your headers match the metric names.");
+        alert("CSV uploaded successfully. Please select a client to populate the data.");
       }
     };
     reader.readAsText(file);
@@ -365,7 +398,12 @@ function NewReportPageContent() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="client">Client *</Label>
-                    <Select value={formData.clientId} onValueChange={(v) => updateField("clientId", v)} disabled={loadingClients}>
+                    <Select value={formData.clientId} onValueChange={(v) => {
+                      updateField("clientId", v);
+                      if (importedCsvData) {
+                        applyCsvDataForClient(v, importedCsvData);
+                      }
+                    }} disabled={loadingClients}>
                       <SelectTrigger id="client">
                         <SelectValue placeholder={loadingClients ? "Loading..." : "Select a client"} />
                       </SelectTrigger>
