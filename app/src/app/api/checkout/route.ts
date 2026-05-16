@@ -6,10 +6,15 @@ export const dynamic = "force-dynamic";
 
 const DODO_API_KEY = process.env.DODO_PAYMENTS_API_KEY || "";
 
-// These can be either a full Dodo checkout URL or a bare product ID
-const PLAN_PRODUCTS: Record<string, string> = {
-  starter: process.env.DODO_STARTER_PRODUCT_ID || "",
-  pro: process.env.DODO_PRO_PRODUCT_ID || "",
+const PLAN_PRODUCTS: Record<string, Record<string, string>> = {
+  starter: {
+    monthly: process.env.NEXT_PUBLIC_DODO_VARIANT_STARTER_MONTHLY || process.env.DODO_STARTER_PRODUCT_ID || "",
+    annual: process.env.NEXT_PUBLIC_DODO_VARIANT_STARTER_ANNUAL || process.env.DODO_STARTER_PRODUCT_ID || "",
+  },
+  pro: {
+    monthly: process.env.NEXT_PUBLIC_DODO_VARIANT_PRO_MONTHLY || process.env.DODO_PRO_PRODUCT_ID || "",
+    annual: process.env.NEXT_PUBLIC_DODO_VARIANT_PRO_ANNUAL || process.env.DODO_PRO_PRODUCT_ID || "",
+  },
 };
 
 interface DodoCheckoutResponse {
@@ -40,9 +45,10 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { plan } = body;
+    const { plan, billing = "monthly" } = body;
 
-    const productValue = PLAN_PRODUCTS[plan] || "";
+    const billingPeriod = billing === "annual" ? "annual" : "monthly";
+    const productValue = PLAN_PRODUCTS[plan]?.[billingPeriod] || "";
     if (!plan || !productValue) {
       return NextResponse.json(
         { error: "Invalid plan or plan not configured." },
@@ -125,8 +131,9 @@ export async function POST(req: NextRequest) {
       checkoutUrl: checkoutData.checkout_url,
       paymentId: checkoutData.payment_id,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[POST /api/checkout]", error);
-    return NextResponse.json({ error: "Internal server error", details: error?.message || String(error) }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: "Internal server error", details: message }, { status: 500 });
   }
 }

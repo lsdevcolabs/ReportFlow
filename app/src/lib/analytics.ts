@@ -106,6 +106,26 @@ export function trackPdfExported(
   });
 }
 
+export function trackReportSent(
+  userId: string,
+  reportId: string
+): void {
+  trackEvent("report_sent", {
+    userId,
+    reportId,
+  });
+}
+
+export function trackAiSummaryGenerated(
+  userId: string,
+  reportId: string
+): void {
+  trackEvent("ai_summary_generated", {
+    userId,
+    reportId,
+  });
+}
+
 export function shutdownAnalytics(): void {
   if (posthogClient) {
     posthogClient.shutdown();

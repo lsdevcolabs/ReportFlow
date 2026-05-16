@@ -8,6 +8,7 @@ import { eq, and } from "drizzle-orm";
 import { isPdfExportAllowed } from "@/lib/plan-limits";
 import type { Plan } from "@/lib/plan-limits";
 import { ReportPDFDocument } from "@/components/reports/report-pdf";
+import { trackPdfExported } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +73,17 @@ export async function GET(
 
     const plan = user.plan as "free" | "starter" | "pro";
 
+    // BUG 1 FIX: Pre-compute channel breakdown percentages
+    const rawMetrics = report.metricsData as Record<string, any>;
+    const channelBreakdown = rawMetrics?.channelBreakdown as Array<{ channel: string; sessions: number; percentage?: number }> | undefined;
+    if (channelBreakdown && channelBreakdown.length > 0) {
+      const totalSessions = channelBreakdown.reduce((sum: number, ch: any) => sum + (ch.sessions || 0), 0);
+      for (const ch of channelBreakdown) {
+        ch.percentage = totalSessions > 0 ? Math.round((ch.sessions / totalSessions) * 100) : 0;
+      }
+      rawMetrics.channelBreakdown = channelBreakdown;
+    }
+
     const pdfBuffer = await renderToBuffer(
       ReportPDFDocument({
         report: {
@@ -80,7 +92,7 @@ export async function GET(
           status: report.status || "draft",
           dateRangeStart: report.dateRangeStart.toISOString(),
           dateRangeEnd: report.dateRangeEnd.toISOString(),
-          metricsData: report.metricsData as Record<string, unknown>,
+          metricsData: rawMetrics,
         },
         client,
         agency: {
@@ -92,6 +104,8 @@ export async function GET(
         whiteLabel: plan === "pro",
       })
     );
+
+    trackPdfExported(userId, report.id);
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {

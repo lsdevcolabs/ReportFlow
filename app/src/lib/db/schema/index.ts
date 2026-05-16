@@ -72,6 +72,8 @@ export const reports = pgTable("reports", {
   isPublic: boolean("is_public").default(false), // Must be true for share link to work
 
   status: text("status").default("draft"), // 'draft' | 'published'
+  lastSentAt: timestamp("last_sent_at"), // When the report was last emailed
+  lastSentTo: text("last_sent_to"), // Email address it was last sent to
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

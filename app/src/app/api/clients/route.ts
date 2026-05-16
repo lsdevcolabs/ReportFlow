@@ -11,6 +11,8 @@ import type { Plan } from "@/lib/plan-limits";
 import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
+import { CreateClientSchema } from "@/lib/validations";
+import { trackClientCreated } from "@/lib/analytics";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
@@ -67,14 +69,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, email, website, industry, brandColor, logoData } = body;
+    const parsed = CreateClientSchema.safeParse(body);
 
-    if (!name) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "VALIDATION_ERROR", message: "Name is required" },
+        { error: "VALIDATION_ERROR", details: parsed.error.issues },
         { status: 400 }
       );
     }
+
+    const { name, email, website, industry, brandColor, logoData } = parsed.data;
 
     const clientLimit = await checkClientLimit(userId, user.plan as Plan);
 
@@ -126,12 +130,13 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
+    trackClientCreated(userId, clientLimit.current + 1);
     revalidatePath("/dashboard", "layout");
     return NextResponse.json({ client: newClient }, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[POST /api/clients]", error);
     return NextResponse.json(
-      { error: "INTERNAL_SERVER_ERROR", message: error?.message, stack: error?.stack },
+      { error: "INTERNAL_SERVER_ERROR" },
       { status: 500 }
     );
   }

@@ -2,11 +2,18 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Search, FileBarChart, Calendar, Filter, Lock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Search, FileBarChart, Calendar, Filter, Lock, MoreHorizontal, Copy, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -22,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PlanLimitBadge, UpgradePrompt } from "@/components/ui/upgrade-prompt";
+import { toast } from "sonner";
 
 interface ReportData {
   id: string;
@@ -50,10 +58,13 @@ interface ReportsClientProps {
 }
 
 export default function ReportsClient({ initialReports, maxReports, plan }: ReportsClientProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [reports, setReports] = useState(initialReports);
   const [isLimitDialogOpen, setIsLimitDialogOpen] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filteredReports = reports.filter((report) => {
     const matchesSearch =
@@ -72,6 +83,50 @@ export default function ReportsClient({ initialReports, maxReports, plan }: Repo
   const handleNewReportClick = () => {
     if (!canCreateReport) {
       setIsLimitDialogOpen(true);
+    }
+  };
+
+  const handleDuplicate = async (e: React.MouseEvent, reportId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDuplicatingId(reportId);
+    try {
+      const res = await fetch(`/api/reports/${reportId}/duplicate`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success("Report duplicated! Enter the new period's data.");
+        router.push(`/reports/${data.report.id}/edit`);
+      } else if (res.status === 403) {
+        setIsLimitDialogOpen(true);
+      } else {
+        const errorData = await res.json();
+        alert(`Failed to duplicate: ${errorData.message || errorData.error || "Unknown error"}`);
+      }
+    } catch {
+      alert("An error occurred while duplicating the report.");
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, reportId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this report? This cannot be undone.")) return;
+    setDeletingId(reportId);
+    try {
+      const res = await fetch(`/api/reports/${reportId}`, { method: "DELETE" });
+      if (res.ok) {
+        setReports((prev) => prev.filter((r) => r.id !== reportId));
+      } else {
+        alert("Failed to delete report.");
+      }
+    } catch {
+      alert("An error occurred while deleting the report.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -171,9 +226,36 @@ export default function ReportsClient({ initialReports, maxReports, plan }: Repo
                         <p className="text-sm font-medium leading-none">{report.client?.name || "Unknown Client"}</p>
                       </div>
                     </div>
-                    <Badge variant={report.isPublic ? "default" : "secondary"}>
-                      {report.isPublic ? "Published" : "Draft"}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant={report.isPublic ? "default" : "secondary"}>
+                        {report.isPublic ? "Published" : "Draft"}
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.preventDefault()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/reports/${report.id}/edit`); }}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => handleDuplicate(e, report.id)} disabled={duplicatingId === report.id}>
+                            {duplicatingId === report.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Copy className="mr-2 h-4 w-4" />
+                            )}
+                            Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => handleDelete(e, report.id)} disabled={deletingId === report.id} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
 
                   <h3 className="font-semibold text-lg mb-2 line-clamp-2">{report.title}</h3>

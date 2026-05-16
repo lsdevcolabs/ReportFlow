@@ -10,6 +10,8 @@ import { nanoid } from "nanoid";
 import { checkReportLimit } from "@/lib/plan-limits";
 import type { Plan } from "@/lib/plan-limits";
 import { revalidatePath } from "next/cache";
+import { CreateReportSchema } from "@/lib/validations";
+import { trackReportCreated } from "@/lib/analytics";
 
 export async function GET(req: NextRequest) {
   try {
@@ -83,15 +85,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    const parsed = CreateReportSchema.safeParse(body);
 
-    const { clientId, title, dateRangeStart, dateRangeEnd, metricsData, isPublic } = body;
-
-    if (!clientId || !title) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "VALIDATION_ERROR", message: "clientId and title are required" },
+        { error: "VALIDATION_ERROR", details: parsed.error.issues },
         { status: 400 }
       );
     }
+
+    const { clientId, title, dateRangeStart, dateRangeEnd, metricsData, isPublic } = parsed.data;
 
     const [client] = await db
       .select()
@@ -133,6 +136,7 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
+    trackReportCreated(userId, clientId);
     revalidatePath("/dashboard", "layout");
     return NextResponse.json({ report: newReport }, { status: 201 });
   } catch (error) {

@@ -1,71 +1,100 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, ArrowRight, Loader2, ShieldCheck, RefreshCw } from "lucide-react";
+import { CheckCircle, ArrowRight, Loader2, ShieldCheck, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
 
-const plans = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    description: "For freelancers just getting started",
-    features: [
-      "1 client",
-      "3 reports total",
-      "Shareable links",
-    ],
-    notIncluded: [
-      "PDF export",
-      "Custom notes",
-      "White-label branding",
-    ],
-    cta: "Get Started",
-    href: "/sign-up",
-    popular: false,
-  },
-  {
-    name: "Starter",
-    price: "$9",
-    period: "/month",
-    annualPrice: "$79/year",
-    description: "For growing agencies",
-    features: [
-      "5 clients",
-      "Unlimited reports",
-      "PDF export",
-      "Custom notes",
-      "Priority support",
-    ],
-    notIncluded: [
-      "White-label branding",
-    ],
-    cta: "Start Starter",
-    plan: "starter",
-    popular: true,
-  },
-  {
-    name: "Pro",
-    price: "$29",
-    period: "/month",
-    annualPrice: "$249/year",
-    description: "For established agencies",
-    features: [
-      "Unlimited clients",
-      "Unlimited reports",
-      "PDF export",
-      "Custom notes",
-      "White-label branding",
-      "Priority support",
-    ],
-    notIncluded: [],
-    cta: "Start Pro",
-    plan: "pro",
-    popular: false,
-  },
-];
+const PRICING = {
+  starter: { monthly: 9, annual: 79, monthlyFromAnnual: 6.58 },
+  pro: { monthly: 29, annual: 249, monthlyFromAnnual: 20.75 },
+} as const;
+
+const SAVINGS_PERCENTAGE = 30;
+
+function getPricing(plan: string, isAnnual: boolean) {
+  const p = PRICING[plan as keyof typeof PRICING];
+  if (!p) return { price: "$0", period: "forever", annualLabel: null };
+  if (isAnnual) {
+    return {
+      price: `$${p.monthlyFromAnnual.toFixed(2)}`,
+      period: "/mo",
+      annualLabel: `billed $${p.annual}/yr (Save ${SAVINGS_PERCENTAGE}%)`,
+      originalPrice: `$${p.monthly}/mo`,
+    };
+  }
+  return { price: `$${p.monthly}`, period: "/mo", annualLabel: null };
+}
+
+function getPlans(isAnnual: boolean) {
+  const starterPricing = getPricing("starter", isAnnual);
+  const proPricing = getPricing("pro", isAnnual);
+
+  return [
+    {
+      name: "Free",
+      price: "$0",
+      period: "forever",
+      description: "For freelancers just getting started",
+      features: [
+        "1 client",
+        "3 reports total",
+        "Shareable links",
+      ],
+      notIncluded: [
+        "PDF export",
+        "Custom notes",
+        "White-label branding",
+      ],
+      cta: "Get Started",
+      href: "/sign-up",
+      popular: false,
+    },
+    {
+      name: "Starter",
+      price: starterPricing.price,
+      period: starterPricing.period,
+      annualLabel: starterPricing.annualLabel,
+      originalPrice: starterPricing.originalPrice,
+      description: "For growing agencies",
+      features: [
+        "5 clients",
+        "Unlimited reports",
+        "PDF export",
+        "Custom notes",
+        "Priority support",
+      ],
+      notIncluded: [
+        "White-label branding",
+      ],
+      cta: "Start Starter",
+      plan: "starter",
+      popular: true,
+    },
+    {
+      name: "Pro",
+      price: proPricing.price,
+      period: proPricing.period,
+      annualLabel: proPricing.annualLabel,
+      originalPrice: proPricing.originalPrice,
+      description: "For established agencies",
+      features: [
+        "Unlimited clients",
+        "Unlimited reports",
+        "PDF export",
+        "Custom notes",
+        "White-label branding",
+        "Priority support",
+      ],
+      notIncluded: [],
+      cta: "Start Pro",
+      plan: "pro",
+      popular: false,
+    },
+  ];
+}
 
 interface UpgradeClientProps {
   currentPlan: string;
@@ -76,6 +105,9 @@ export default function UpgradeClient({ currentPlan: initialPlan }: UpgradeClien
   const [checkoutOpened, setCheckoutOpened] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [currentPlan, setCurrentPlan] = useState(initialPlan);
+  const [isAnnual, setIsAnnual] = useState(true);
+
+  const plans = getPlans(isAnnual);
 
   const handleCheckout = async (plan: string) => {
     setLoading(plan);
@@ -84,7 +116,7 @@ export default function UpgradeClient({ currentPlan: initialPlan }: UpgradeClien
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, billing: isAnnual ? "annual" : "monthly" }),
       });
 
       const data = await res.json();
@@ -177,6 +209,28 @@ export default function UpgradeClient({ currentPlan: initialPlan }: UpgradeClien
         </p>
       </div>
 
+      {!isPaidPlan && (
+        <div className="flex justify-center mb-10">
+          <div className="inline-flex items-center gap-3 bg-muted rounded-full p-1">
+            <span className={`text-sm font-medium px-3 py-1.5 rounded-full transition-colors ${!isAnnual ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+              Monthly
+            </span>
+            <Switch
+              checked={isAnnual}
+              onCheckedChange={setIsAnnual}
+              aria-label="Toggle annual billing"
+            />
+            <span className={`text-sm font-medium px-3 py-1.5 rounded-full transition-colors ${isAnnual ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+              Annual
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full ml-1">
+              <Sparkles className="h-3 w-3" />
+              Save {SAVINGS_PERCENTAGE}%
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-3 gap-8">
         {plans.map((plan) => {
           const isCurrentPlan = plan.name.toLowerCase() === currentPlan.toLowerCase();
@@ -206,10 +260,13 @@ export default function UpgradeClient({ currentPlan: initialPlan }: UpgradeClien
                 <CardTitle className="text-2xl">{plan.name}</CardTitle>
                 <CardDescription>{plan.description}</CardDescription>
                 <div className="pt-4">
+                  {plan.originalPrice && isAnnual && (
+                    <span className="text-lg text-muted-foreground line-through mr-2">{plan.originalPrice}</span>
+                  )}
                   <span className="text-4xl font-bold">{plan.price}</span>
                   <span className="text-muted-foreground">{plan.period}</span>
-                  {plan.annualPrice && (
-                    <p className="text-sm text-primary mt-1">{plan.annualPrice}</p>
+                  {plan.annualLabel && (
+                    <p className="text-xs text-muted-foreground mt-1">{plan.annualLabel}</p>
                   )}
                 </div>
               </CardHeader>

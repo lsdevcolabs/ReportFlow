@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { sendWelcomeEmail } from "@/lib/email";
+import { trackUserSignedUp } from "@/lib/analytics";
 
 /**
  * Ensures a user exists in the database.
@@ -37,6 +39,13 @@ export async function ensureUserExists(clerkUserId: string, email?: string, name
       subscriptionStatus: "inactive",
     })
     .returning();
+
+  // Send welcome email and track signup event (fire-and-forget)
+  const displayName = name || email.split("@")[0];
+  sendWelcomeEmail(email, displayName).catch((err) =>
+    console.error("[ensureUserExists] Failed to send welcome email:", err)
+  );
+  trackUserSignedUp(clerkUserId, "clerk");
 
   return newUser;
 }

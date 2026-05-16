@@ -3,6 +3,7 @@ import { Webhook } from "standardwebhooks";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { trackPlanUpgraded } from "@/lib/analytics";
 
 const DODO_WEBHOOK_SECRET = process.env.DODO_WEBHOOK_SECRET || "";
 
@@ -56,191 +57,202 @@ function getSubscriptionStatus(status: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  // Always return 200 immediately — process webhook in background
+  // This prevents Dodo from retrying and ensures fast response times
+
+  if (!process.env.DATABASE_URL || !DODO_WEBHOOK_SECRET) {
+    return new NextResponse(null, { status: 200 });
+  }
+
+  const rawBody = await req.text();
+
+  // Verify webhook signature
   try {
-    if (!process.env.DATABASE_URL) {
-      return NextResponse.json({ error: "Service not configured" }, { status: 500 });
-    }
-
-    if (!DODO_WEBHOOK_SECRET) {
-      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
-    }
-
-    const rawBody = await req.text();
-    
-    // Verify webhook signature using standard-webhooks
     const webhook = new Webhook(DODO_WEBHOOK_SECRET);
-    const signature = req.headers.get("webhook-signature") || "";
-    
-    try {
-      await webhook.verify(rawBody, {
-        "webhook-id": req.headers.get("webhook-id") || "",
-        "webhook-signature": signature,
-        "webhook-timestamp": req.headers.get("webhook-timestamp") || "",
-      });
-    } catch (verificationError) {
-      console.error("[Dodo Webhook] Signature verification failed:", verificationError);
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
+    await webhook.verify(rawBody, {
+      "webhook-id": req.headers.get("webhook-id") || "",
+      "webhook-signature": req.headers.get("webhook-signature") || "",
+      "webhook-timestamp": req.headers.get("webhook-timestamp") || "",
+    });
+  } catch (verificationError) {
+    console.error("[Dodo Webhook] Signature verification failed:", verificationError);
+    return new NextResponse(null, { status: 200 });
+  }
 
-    const payload: DodoWebhookPayload = JSON.parse(rawBody);
-    const event = payload.event;
-    const data = payload.data;
+  // Process webhook asynchronously (fire-and-forget)
+  processWebhook(rawBody).catch((err) => {
+    console.error("[Dodo Webhook] Background processing error:", err);
+  });
 
-    // Extract user ID from metadata or email
-    let userId: string | null = null;
-    
-    // Try to get user from email first
-    if (data.attributes.customer?.email) {
-      const [user] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, data.attributes.customer.email.toLowerCase()))
-        .limit(1);
-      userId = user?.id || null;
-    }
+  return new NextResponse(null, { status: 200 });
+}
 
-    if (!userId) {
-      console.error("[Dodo Webhook] No user found for event:", event);
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+async function processWebhook(rawBody: string): Promise<void> {
+  const payload: DodoWebhookPayload = JSON.parse(rawBody);
+  const event = payload.event;
+  const data = payload.data;
 
-    console.log(`[Dodo Webhook] Processing event: ${event} for user: ${userId}`);
+  // Extract user ID from email
+  let userId: string | null = null;
 
-    switch (event) {
-      case "payment.succeeded": {
-        const payment = data.attributes.payment;
-        if (payment && payment.status === "succeeded") {
-          // Update user with payment information
-          await db
-            .update(users)
-            .set({
-              dodoPaymentId: payment.id,
-              subscriptionStatus: "active",
-              updatedAt: new Date(),
-            })
-            .where(eq(users.id, userId));
+  if (data.attributes.customer?.email) {
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, data.attributes.customer.email.toLowerCase()))
+      .limit(1);
+    userId = user?.id || null;
+  }
 
-          console.log(`[Dodo Webhook] Payment succeeded: user=${userId}, paymentId=${payment.id}`);
-        }
-        break;
-      }
+  if (!userId) {
+    console.error("[Dodo Webhook] No user found for event:", event);
+    return;
+  }
 
-      case "subscription.active":
-      case "subscription.renewed": {
-        const subscription = data.attributes.subscription;
-        if (subscription && subscription.status === "active") {
-          const plan = getPlanFromProductName(
-            subscription.product_name || "",
-            subscription.variant_name || "",
-            subscription.price || 0
-          );
+  console.log(`[Dodo Webhook] Processing event: ${event} for user: ${userId}`);
 
-          await db
-            .update(users)
-            .set({
-              plan,
-              dodoCustomerId: data.attributes.customer?.id,
-              dodoSubscriptionId: subscription.id,
-              subscriptionStatus: "active",
-              updatedAt: new Date(),
-            })
-            .where(eq(users.id, userId));
-
-          console.log(`[Dodo Webhook] Subscription ${event}: user=${userId}, plan=${plan}, status=active`);
-        }
-        break;
-      }
-
-      case "subscription.plan_changed": {
-        const subscription = data.attributes.subscription;
-        if (subscription) {
-          const plan = getPlanFromProductName(
-            subscription.product_name || "",
-            subscription.variant_name || "",
-            subscription.price || 0
-          );
-
-          await db
-            .update(users)
-            .set({
-              plan,
-              dodoSubscriptionId: subscription.id,
-              updatedAt: new Date(),
-            })
-            .where(eq(users.id, userId));
-
-          console.log(`[Dodo Webhook] Subscription plan changed: user=${userId}, newPlan=${plan}`);
-        }
-        break;
-      }
-
-      case "subscription.on_hold":
-      case "subscription.failed": {
-        const subscription = data.attributes.subscription;
-        if (subscription) {
-          await db
-            .update(users)
-            .set({
-              subscriptionStatus: "past_due",
-              updatedAt: new Date(),
-            })
-            .where(eq(users.id, userId));
-
-          console.log(`[Dodo Webhook] Subscription ${event}: user=${userId}, status=past_due`);
-        }
-        break;
-      }
-
-      case "subscription.cancelled":
-      case "subscription.expired": {
+  switch (event) {
+    case "payment.succeeded": {
+      const payment = data.attributes.payment;
+      if (payment && payment.status === "succeeded") {
         await db
           .update(users)
           .set({
-            plan: "free",
+            dodoPaymentId: payment.id,
+            subscriptionStatus: "active",
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+
+        console.log(`[Dodo Webhook] Payment succeeded: user=${userId}, paymentId=${payment.id}`);
+      }
+      break;
+    }
+
+    case "subscription.active":
+    case "subscription.renewed": {
+      const subscription = data.attributes.subscription;
+      if (subscription && subscription.status === "active") {
+        const plan = getPlanFromProductName(
+          subscription.product_name || "",
+          subscription.variant_name || "",
+          subscription.price || 0
+        );
+
+        const [currentUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        const previousPlan = currentUser?.plan || "free";
+
+        await db
+          .update(users)
+          .set({
+            plan,
+            dodoCustomerId: data.attributes.customer?.id,
+            dodoSubscriptionId: subscription.id,
+            subscriptionStatus: "active",
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+
+        if (plan !== previousPlan) {
+          trackPlanUpgraded(userId, previousPlan, plan);
+        }
+
+        console.log(`[Dodo Webhook] Subscription ${event}: user=${userId}, plan=${plan}, status=active`);
+      }
+      break;
+    }
+
+    case "subscription.plan_changed": {
+      const subscription = data.attributes.subscription;
+      if (subscription) {
+        const plan = getPlanFromProductName(
+          subscription.product_name || "",
+          subscription.variant_name || "",
+          subscription.price || 0
+        );
+
+        await db
+          .update(users)
+          .set({
+            plan,
+            dodoCustomerId: data.attributes.customer?.id,
+            dodoSubscriptionId: subscription.id,
+            subscriptionStatus: getSubscriptionStatus(subscription.status || "active"),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+
+        console.log(`[Dodo Webhook] Subscription ${event}: User ${userId} -> plan=${plan}, status=${subscription.status}`);
+      }
+      break;
+    }
+
+    case "subscription.cancelled": {
+      const subscription = data.attributes.subscription;
+      if (subscription) {
+        await db
+          .update(users)
+          .set({
             subscriptionStatus: "cancelled",
             updatedAt: new Date(),
           })
           .where(eq(users.id, userId));
 
-        console.log(`[Dodo Webhook] Subscription ${event}: user=${userId} downgraded to free`);
-        break;
+        console.log(`[Dodo Webhook] Subscription cancelled: user=${userId}`);
       }
-
-      case "subscription.updated": {
-        const subscription = data.attributes.subscription;
-        if (subscription) {
-          const plan = getPlanFromProductName(
-            subscription.product_name || "",
-            subscription.variant_name || "",
-            subscription.price || 0
-          );
-          const subscriptionStatus = getSubscriptionStatus(subscription.status || "");
-
-          await db
-            .update(users)
-            .set({
-              plan,
-              dodoSubscriptionId: subscription.id,
-              subscriptionStatus,
-              updatedAt: new Date(),
-            })
-            .where(eq(users.id, userId));
-
-          console.log(`[Dodo Webhook] Subscription updated: user=${userId}, plan=${plan}, status=${subscriptionStatus}`);
-        }
-        break;
-      }
-
-      default:
-        console.log(`[Dodo Webhook] Unhandled event: ${event}`);
+      break;
     }
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("[POST /api/webhooks/dodo]", error);
-    return NextResponse.json(
-      { error: "Webhook processing failed" },
-      { status: 500 }
-    );
+    case "subscription.expired": {
+      const subscription = data.attributes.subscription;
+      if (subscription) {
+        await db
+          .update(users)
+          .set({
+            subscriptionStatus: "inactive",
+            plan: "free",
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+
+        console.log(`[Dodo Webhook] Subscription expired: user=${userId} downgraded to free`);
+      }
+      break;
+    }
+
+    case "subscription.on_hold": {
+      const subscription = data.attributes.subscription;
+      if (subscription) {
+        await db
+          .update(users)
+          .set({
+            subscriptionStatus: "past_due",
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+
+        console.log(`[Dodo Webhook] Subscription on_hold: user=${userId}`);
+      }
+      break;
+    }
+
+    case "payment.failed": {
+      const payment = data.attributes.payment;
+      if (payment) {
+        await db
+          .update(users)
+          .set({
+            subscriptionStatus: "past_due",
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+
+        console.log(`[Dodo Webhook] Payment failed: user=${userId}, paymentId=${payment.id}`);
+      }
+      break;
+    }
+
+    default:
+      console.log(`[Dodo Webhook] Unhandled event type: ${event}`);
   }
 }

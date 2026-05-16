@@ -5,6 +5,7 @@ import { getCurrentUserId } from "@/lib/clerk-auth";
 import { db } from "@/lib/db";
 import { reports, clients } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { trackReportShared } from "@/lib/analytics";
 
 export async function GET(
   req: NextRequest,
@@ -97,6 +98,10 @@ export async function PUT(
       })
       .where(and(eq(reports.id, id), eq(reports.userId, userId)))
       .returning();
+
+    if (isPublic === true && !existingReport.isPublic) {
+      trackReportShared(userId, id);
+    }
 
     return NextResponse.json({ report: updatedReport });
   } catch (error) {

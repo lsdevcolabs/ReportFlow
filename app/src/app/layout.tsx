@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,7 +21,10 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className={inter.className}>
-        <body className="min-h-screen flex flex-col w-full overflow-x-hidden">{children}</body>
+        <body className="min-h-screen flex flex-col w-full overflow-x-hidden">
+          {children}
+          <Toaster richColors position="top-right" />
+        </body>
       </html>
     </ClerkProvider>
   );

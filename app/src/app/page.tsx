@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle, BarChart3, Link as LinkIcon, FileText, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PricingSection } from "@/components/landing/pricing-section";
 
 const features = [
   {
@@ -44,55 +45,22 @@ const steps = [
   },
 ];
 
-const testimonials = [
+// Product showcase highlights (replaces placeholder testimonials)
+const showcaseHighlights = [
   {
-    quote: "I used to spend 4 hours every week on client reports. Now it takes 15 minutes.",
-    author: "Sarah Chen",
-    role: "SEO Consultant",
+    stat: "2 min",
+    label: "Average time to create a report",
   },
   {
-    quote: "My clients love receiving these reports. They feel professional and data-driven.",
-    author: "Marcus Johnson",
-    role: "PPC Manager",
+    stat: "$29/mo",
+    label: "Unlimited clients — no per-client fees",
+  },
+  {
+    stat: "1-click",
+    label: "Share via link or export as PDF",
   },
 ];
 
-const plans = [
-  {
-    name: "Free",
-    price: "$0",
-    description: "For freelancers just getting started",
-    features: [
-      "1 client",
-      "3 reports total",
-      "Shareable links",
-    ],
-  },
-  {
-    name: "Starter",
-    price: "$9",
-    description: "For growing agencies",
-    features: [
-      "5 clients",
-      "Unlimited reports",
-      "PDF export",
-      "Custom notes",
-    ],
-    popular: true,
-  },
-  {
-    name: "Pro",
-    price: "$29",
-    description: "For established agencies",
-    features: [
-      "Unlimited clients",
-      "Unlimited reports",
-      "PDF export",
-      "Custom notes",
-      "White-label",
-    ],
-  },
-];
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
@@ -215,60 +183,21 @@ export default async function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section className="py-20" id="pricing">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-4">Simple Pricing</h2>
-          <p className="text-muted-foreground text-center mb-12">Start free, upgrade when you need more.</p>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {plans.map((plan) => (
-              <Card key={plan.name} className={plan.popular ? "border-primary shadow-lg" : ""}>
-                {plan.popular && (
-                  <div className="bg-primary text-primary-foreground text-center py-1 text-sm font-medium">
-                    Most Popular
-                  </div>
-                )}
-                <CardHeader>
-                  <CardTitle>{plan.name}</CardTitle>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground">/month</span>
-                  </div>
-                  <CardDescription>{plan.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-primary shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href={plan.name === "Free" ? "/sign-up" : "/sign-up?plan=" + plan.name.toLowerCase()}>
-                    <Button className="w-full mt-6" variant={plan.popular ? "default" : "outline"}>
-                      {plan.name === "Free" ? "Get Started" : "Start Free Trial"}
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PricingSection />
 
-      {/* Testimonials */}
+      {/* Product Showcase */}
       <section className="py-20 bg-muted/50">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">What Users Say</h2>
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {testimonials.map((testimonial) => (
-              <Card key={testimonial.author}>
-                <CardContent className="pt-6">
-                  <p className="text-lg mb-4">&quot;{testimonial.quote}&quot;</p>
-                  <div>
-                    <p className="font-medium">{testimonial.author}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                  </div>
+          <h2 className="text-3xl font-bold text-center mb-4">Built for Speed</h2>
+          <p className="text-muted-foreground text-center mb-12 max-w-2xl mx-auto">
+            ReportFlow is designed to get you from raw data to a professional client report in minutes, not hours.
+          </p>
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            {showcaseHighlights.map((item) => (
+              <Card key={item.label}>
+                <CardContent className="pt-6 text-center">
+                  <p className="text-4xl font-bold text-primary mb-2">{item.stat}</p>
+                  <p className="text-sm text-muted-foreground">{item.label}</p>
                 </CardContent>
               </Card>
             ))}
@@ -280,7 +209,7 @@ export default async function LandingPage() {
       <section className="py-20">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to save hours every week?</h2>
-          <p className="text-muted-foreground mb-8">Join thousands of marketers who create professional reports in minutes.</p>
+          <p className="text-muted-foreground mb-8">Create professional client reports in minutes, not hours. Start free.</p>
           <Link href="/sign-up">
             <Button size="lg">
               Start Free Today
@@ -300,7 +229,7 @@ export default async function LandingPage() {
               </div>
               <span className="font-semibold">ReportFlow</span>
             </div>
-            <p className="text-sm text-muted-foreground">© 2025 ReportFlow. All rights reserved.</p>
+            <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} ReportFlow. All rights reserved.</p>
           </div>
         </div>
       </footer>

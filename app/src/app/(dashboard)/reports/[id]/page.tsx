@@ -3,13 +3,15 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Edit, Trash2, Copy, ExternalLink, Check, Loader2, FileText, Globe, GlobeLock, Download } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Copy, ExternalLink, Check, Loader2, FileText, Globe, GlobeLock, Download, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +22,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   BarChart,
   Bar,
@@ -56,6 +66,8 @@ interface ReportData {
   createdAt: string;
   shareToken: string | null;
   metricsData: MetricsData;
+  lastSentAt?: string | null;
+  lastSentTo?: string | null;
   client?: {
     name: string;
     brandColor: string;
@@ -84,6 +96,15 @@ export default function ReportDetailPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Send modal state
+  const [isSendOpen, setIsSendOpen] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendTo, setSendTo] = useState("");
+  const [sendSubject, setSendSubject] = useState("");
+  const [sendMessage, setSendMessage] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccess, setSendSuccess] = useState(false);
 
   useEffect(() => {
     async function fetchReport() {
@@ -224,6 +245,85 @@ export default function ReportDetailPage() {
     }
   };
 
+  const handleOpenSendModal = async () => {
+    if (!report) return;
+
+    // Check if report is published
+    if (!report.isPublic || !report.shareToken) {
+      alert("Please publish the report first before sending it to a client.");
+      return;
+    }
+
+    // Fetch client email
+    try {
+      const res = await fetch(`/api/clients/${report.clientId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.client?.email) {
+          setSendTo(data.client.email);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch client email", e);
+    }
+
+    // Set default subject
+    const dateRange = `${new Date(report.dateRangeStart).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${new Date(report.dateRangeEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+    setSendSubject(`${report.title} — ${dateRange}`);
+    setSendMessage("");
+    setSendError(null);
+    setSendSuccess(false);
+    setIsSendOpen(true);
+  };
+
+  const handleSendReport = async () => {
+    if (!report || !sendTo) return;
+
+    setIsSending(true);
+    setSendError(null);
+
+    try {
+      const res = await fetch(`/api/reports/${report.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: sendTo,
+          subject: sendSubject,
+          message: sendMessage || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error === "UPGRADE_REQUIRED") {
+          setSendError("Email delivery requires a Starter or Pro plan. Please upgrade to continue.");
+        } else {
+          setSendError(data.message || "Failed to send email. Please try again.");
+        }
+        return;
+      }
+
+      setSendSuccess(true);
+      // Refresh report data to show updated lastSentAt
+      setTimeout(() => {
+        setIsSendOpen(false);
+        setSendSuccess(false);
+        // Re-fetch report
+        fetch(`/api/reports/${report.id}`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.report) setReport(d.report);
+          });
+      }, 2000);
+    } catch (e) {
+      console.error("Failed to send report", e);
+      setSendError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const formatNumber = (num: number) => num.toLocaleString();
 
   return (
@@ -262,6 +362,14 @@ export default function ReportDetailPage() {
                   <Download className="mr-2 h-4 w-4" />
                 )}
                 PDF
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleOpenSendModal}
+                disabled={!report.isPublic}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Send to Client
               </Button>
               {report.shareToken && report.isPublic && (
             <>
@@ -332,6 +440,15 @@ export default function ReportDetailPage() {
               {report.isPublic ? "Published" : "Draft"}
             </Badge>
           </div>
+          {report.lastSentAt && (
+            <div className="mt-3 pt-3 border-t flex items-center gap-2 text-sm text-muted-foreground">
+              <Send className="h-4 w-4" />
+              <span>
+                Last sent {new Date(report.lastSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                {report.lastSentTo && ` to ${report.lastSentTo}`}
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -442,6 +559,84 @@ export default function ReportDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Send to Client Dialog */}
+      <Dialog open={isSendOpen} onOpenChange={setIsSendOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Send Report to Client</DialogTitle>
+            <DialogDescription>
+              Send a branded email with a link to view this report.
+            </DialogDescription>
+          </DialogHeader>
+
+          {sendSuccess ? (
+            <div className="py-8 text-center">
+              <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                <Check className="h-6 w-6 text-green-600" />
+              </div>
+              <p className="text-lg font-medium">Report Sent!</p>
+              <p className="text-sm text-muted-foreground">Your client will receive the email shortly.</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sendTo">To</Label>
+                  <Input
+                    id="sendTo"
+                    type="email"
+                    placeholder="client@example.com"
+                    value={sendTo}
+                    onChange={(e) => setSendTo(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sendSubject">Subject</Label>
+                  <Input
+                    id="sendSubject"
+                    value={sendSubject}
+                    onChange={(e) => setSendSubject(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sendMessage">Message (optional)</Label>
+                  <Textarea
+                    id="sendMessage"
+                    placeholder="Add a personal note to include in the email..."
+                    value={sendMessage}
+                    onChange={(e) => setSendMessage(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+                {sendError && (
+                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                    {sendError}
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsSendOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSendReport} disabled={isSending || !sendTo || !sendSubject}>
+                  {isSending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send Report
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Dialog */}
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

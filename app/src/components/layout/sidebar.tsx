@@ -92,6 +92,7 @@ export function Sidebar() {
         <div className="space-y-1">
           {secondaryNavigation.map((item) => {
             const isActive = pathname === item.href;
+            const isUpgradeHighlight = item.name === "Upgrade" && plan === "free" && !isActive;
             return (
               <Link
                 key={item.name}
@@ -100,11 +101,18 @@ export function Sidebar() {
                   "flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-primary text-primary-foreground"
+                    : isUpgradeHighlight
+                    ? "text-primary bg-primary/10 hover:bg-primary/20"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <item.icon className="h-5 w-5" />
                 {item.name}
+                {isUpgradeHighlight && (
+                  <span className="ml-auto text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
+                    !
+                  </span>
+                )}
               </Link>
             );
           })}

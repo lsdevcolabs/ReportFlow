@@ -8,6 +8,8 @@ export const PLAN_LIMITS = {
     pdfExport: false,
     shareableLinks: true,
     customNotes: false,
+    emailDelivery: false,
+    aiSummary: false,
   },
   starter: {
     maxClients: 5,
@@ -16,6 +18,8 @@ export const PLAN_LIMITS = {
     pdfExport: true,
     shareableLinks: true,
     customNotes: true,
+    emailDelivery: true,
+    aiSummary: true,
   },
   pro: {
     maxClients: Infinity,
@@ -24,6 +28,8 @@ export const PLAN_LIMITS = {
     pdfExport: true,
     shareableLinks: true,
     customNotes: true,
+    emailDelivery: true,
+    aiSummary: true,
   },
 } as const;
 
@@ -91,6 +97,8 @@ export function getUpgradeMessage(feature: PlanFeature): string {
     pdfExport: "Upgrade to Starter for PDF export",
     shareableLinks: "Shareable links are available on all plans",
     customNotes: "Upgrade to Starter for custom notes",
+    emailDelivery: "Upgrade to Starter to send reports via email",
+    aiSummary: "Upgrade to Starter for AI-generated summaries",
   };
   return messages[feature];
 }

@@ -6,10 +6,10 @@ type Plan = "free" | "starter" | "pro";
 
 export type { Plan };
 
-const PLAN_LIMITS: Record<Plan, { maxClients: number; maxReports: number; whiteLabel: boolean; pdfExport: boolean }> = {
-  free: { maxClients: 1, maxReports: 3, whiteLabel: false, pdfExport: true },
-  starter: { maxClients: 5, maxReports: Infinity, whiteLabel: false, pdfExport: true },
-  pro: { maxClients: Infinity, maxReports: Infinity, whiteLabel: true, pdfExport: true },
+const PLAN_LIMITS: Record<Plan, { maxClients: number; maxReports: number; whiteLabel: boolean; pdfExport: boolean; customNotes: boolean; emailDelivery: boolean; aiSummary: boolean }> = {
+  free: { maxClients: 1, maxReports: 3, whiteLabel: false, pdfExport: false, customNotes: false, emailDelivery: false, aiSummary: false },
+  starter: { maxClients: 5, maxReports: Infinity, whiteLabel: false, pdfExport: true, customNotes: true, emailDelivery: true, aiSummary: true },
+  pro: { maxClients: Infinity, maxReports: Infinity, whiteLabel: true, pdfExport: true, customNotes: true, emailDelivery: true, aiSummary: true },
 };
 
 export interface PlanLimitResult {
@@ -114,5 +114,13 @@ export function isPdfExportAllowed(plan: Plan): boolean {
 }
 
 export function isCustomNotesAllowed(plan: Plan): boolean {
-  return PLAN_LIMITS[plan].whiteLabel; // Using whiteLabel as proxy for custom notes
+  return PLAN_LIMITS[plan].customNotes;
+}
+
+export function isEmailDeliveryAllowed(plan: Plan): boolean {
+  return PLAN_LIMITS[plan].emailDelivery;
+}
+
+export function isAiSummaryAllowed(plan: Plan): boolean {
+  return PLAN_LIMITS[plan].aiSummary;
 }
