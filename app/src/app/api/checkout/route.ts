@@ -70,15 +70,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Determine environment: test if API key starts with test prefix or has "test" in it
-    const isTestKey = DODO_API_KEY.toLowerCase().includes("test") || 
-                      process.env.NODE_ENV === "development" ||
-                      productId.includes("test"); // sometimes ID might give a hint
+    // Determine environment: check explicit clues first
+    let isTestEnv = DODO_API_KEY.toLowerCase().includes("test") || 
+                    process.env.NODE_ENV === "development" ||
+                    productValue.includes("test") ||
+                    productId.includes("test");
     
-    // As per documentation, test environment API is test.dodopayments.com
-    const baseUrl = isTestKey || DODO_API_KEY.startsWith("test_") 
-      ? "https://test.dodopayments.com"
-      : "https://live.dodopayments.com";
+    let baseUrl = isTestEnv ? "https://test.dodopayments.com" : "https://live.dodopayments.com";
 
     const checkoutPayload = {
       product_cart: [{ product_id: productId, quantity: 1 }],
@@ -87,7 +85,7 @@ export async function POST(req: NextRequest) {
       metadata: { user_id: userId },
     };
 
-    const dodoResponse = await fetch(`${baseUrl}/checkouts`, {
+    let dodoResponse = await fetch(`${baseUrl}/checkouts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -96,12 +94,26 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(checkoutPayload),
     });
 
+    // If Unauthorized, we might have guessed the wrong environment for the API key
+    if (dodoResponse.status === 401 || dodoResponse.status === 403) {
+      isTestEnv = !isTestEnv;
+      baseUrl = isTestEnv ? "https://test.dodopayments.com" : "https://live.dodopayments.com";
+      dodoResponse = await fetch(`${baseUrl}/checkouts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${DODO_API_KEY}`,
+        },
+        body: JSON.stringify(checkoutPayload),
+      });
+    }
+
     if (!dodoResponse.ok) {
       const errorData = await dodoResponse.text();
       console.error("[POST /api/checkout] Dodo API error:", dodoResponse.status, errorData);
 
       // We still use a direct fallback just in case the API is down
-      const fallbackUrl = `${isTestKey ? "https://test.checkout.dodopayments.com" : "https://checkout.dodopayments.com"}/buy/${productId}?quantity=1&email=${encodeURIComponent(user.email)}&customer_name=${encodeURIComponent(userName)}&redirect_url=${encodeURIComponent(appUrl + "/dashboard")}&metadata_user_id=${userId}`;
+      const fallbackUrl = `${isTestEnv ? "https://test.checkout.dodopayments.com" : "https://checkout.dodopayments.com"}/buy/${productId}?quantity=1&email=${encodeURIComponent(user.email)}&customer_name=${encodeURIComponent(userName)}&redirect_url=${encodeURIComponent(appUrl + "/dashboard")}&metadata_user_id=${userId}`;
       return NextResponse.json({
         checkoutUrl: fallbackUrl,
         warning: "API call failed, used direct link fallback.",
