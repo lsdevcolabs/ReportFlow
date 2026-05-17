@@ -122,7 +122,7 @@ export async function POST(
       : undefined;
 
     // Determine from name based on white-label settings
-    const isWhiteLabel = plan === "pro" && user.agencyName;
+    const isWhiteLabel = plan === "pro" && !!user.agencyName;
     const fromName = isWhiteLabel ? user.agencyName : "ReportFlow";
 
     // Render email template to HTML

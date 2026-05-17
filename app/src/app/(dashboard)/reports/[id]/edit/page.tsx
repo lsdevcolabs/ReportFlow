@@ -542,7 +542,7 @@ function EditReportPageContent() {
                           })}
                       </div>
 
-                      {metricsData.executiveSummary && (
+                      {Boolean(metricsData.executiveSummary) && (
                         <div className="pt-4 border-t">
                           <p className="text-sm font-medium mb-2">Summary</p>
                           <p className="text-sm text-muted-foreground line-clamp-3">

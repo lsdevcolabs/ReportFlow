@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "USER_NOT_FOUND" }, { status: 404 });
   }
 
-  if (!canPerformAction(user.plan, "aiSummary")) {
+  if (!canPerformAction(user.plan as import("@/lib/plans").Plan, "aiSummary")) {
     return Response.json(
       {
         error: "PLAN_LIMIT_REACHED",

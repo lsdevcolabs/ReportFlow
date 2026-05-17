@@ -47,7 +47,7 @@ export default function ClientDetailClient({ initialClient, initialReports }: Cl
         const base64 = await new Promise<string>((resolve, reject) => {
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = reject;
-          reader.readAsDataURL(data.logoFile);
+          reader.readAsDataURL(data.logoFile as File);
         });
         updateData.logoData = base64;
         delete updateData.logoUrl;

@@ -13,7 +13,7 @@ export const UpdateClientSchema = CreateClientSchema.partial();
 
 // Flexible schema — accepts any JSON structure for metricsData
 // Template-specific data is validated client-side, stored as JSONB
-export const MetricsDataSchema = z.record(z.unknown()).optional();
+export const MetricsDataSchema = z.record(z.string(), z.unknown()).optional();
 
 export const CreateReportSchema = z.object({
   clientId: z.string().min(1, "clientId is required"),
