@@ -17,7 +17,7 @@ const uploadSchema = z.object({
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 function base64ToBuffer(base64: string): Buffer {
-  const base64Data = base64.replace(/^data:image\/\w+;base64,/, "");
+  const base64Data = base64.replace(/^data:image\/[\w+.-]+;base64,/, "");
   return Buffer.from(base64Data, "base64");
 }
 
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const extension = dataUrl.match(/^data:image\/(\w+);/)?.[1] || "png";
+    const extension = dataUrl.match(/^data:image\/([\w+.-]+);/)?.[1] || "png";
     const filename = `client-logos/${clientId}/${nanoid()}.${extension}`;
 
     const blob = await put(filename, imageBuffer, {

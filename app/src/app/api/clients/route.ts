@@ -17,7 +17,7 @@ import { trackClientCreated } from "@/lib/analytics";
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 function base64ToBuffer(base64: string): Buffer {
-  const base64Data = base64.replace(/^data:image\/\w+;base64,/, "");
+  const base64Data = base64.replace(/^data:image\/[\w+.-]+;base64,/, "");
   return Buffer.from(base64Data, "base64");
 }
 
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
             { status: 400 }
           );
         }
-        const extension = logoData.match(/^data:image\/(\w+);/)?.[1] || "png";
+        const extension = logoData.match(/^data:image\/([\w+.-]+);/)?.[1] || "png";
         const filename = `client-logos/temp-${nanoid()}.${extension}`;
         
         const blob = await put(filename, imageBuffer, {
@@ -113,8 +113,11 @@ export async function POST(req: NextRequest) {
         });
         logoUrl = blob.url;
       } catch (e) {
-        console.error("Logo upload failed:", e);
+        console.error("Logo upload failed, falling back to base64:", e);
+        logoUrl = logoData;
       }
+    } else if (logoData) {
+      logoUrl = logoData;
     }
 
     const [newClient] = await db
