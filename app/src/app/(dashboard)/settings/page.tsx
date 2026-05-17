@@ -239,33 +239,33 @@ export default function SettingsPage() {
             </CardTitle>
             <CardDescription>Customize the look and feel of your shared reports.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Agency Logo</Label>
-                  <Label htmlFor="logo-upload" className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer block">
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="Agency Logo" className="h-16 object-contain mb-2" />
-                    ) : (
-                      <>
-                        <div className="h-12 w-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-3">
-                          <Building2 className="h-6 w-6" />
-                        </div>
-                        <p className="font-medium">Click to upload logo</p>
-                        <p className="text-xs text-muted-foreground mt-1">SVG, PNG, or JPG (max 2MB)</p>
-                      </>
-                    )}
-                    <Input 
-                      id="logo-upload" 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handleLogoUpload}
-                    />
-                  </Label>
-                </div>
+          <CardContent className="space-y-8">
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div className="space-y-2 flex flex-col">
+                <Label>Agency Logo</Label>
+                <Label htmlFor="logo-upload" className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer flex-1">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Agency Logo" className="h-16 object-contain mb-2" />
+                  ) : (
+                    <>
+                      <div className="h-12 w-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-3">
+                        <Building2 className="h-6 w-6" />
+                      </div>
+                      <p className="font-medium">Click to upload logo</p>
+                      <p className="text-xs text-muted-foreground mt-1">SVG, PNG, or JPG (max 2MB)</p>
+                    </>
+                  )}
+                  <Input 
+                    id="logo-upload" 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleLogoUpload}
+                  />
+                </Label>
+              </div>
 
+              <div className="space-y-6 flex flex-col justify-between">
                 <div className="space-y-2">
                   <Label>Default Brand Color</Label>
                   <div className="flex gap-3">
@@ -288,41 +288,41 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
-                <Button onClick={handleSaveProfile} disabled={isSaving}>
+                <Button onClick={handleSaveProfile} disabled={isSaving} className="w-full sm:w-auto self-start mt-auto">
                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Preferences
                 </Button>
               </div>
+            </div>
 
-              <div className="bg-muted/30 rounded-xl p-6 border flex flex-col items-center justify-center text-center">
-                <div className="bg-card rounded-lg border shadow-sm flex flex-col overflow-hidden w-full">
-                  <div className="h-2 w-full" style={{ backgroundColor: brandColor }} />
-                  <div className="p-4 flex-1 flex flex-col">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="space-y-1">
-                        <div className="h-3 w-16 bg-muted rounded" />
-                        <div className="h-4 w-32 bg-muted rounded" />
-                      </div>
-                      <div
-                        className="h-8 w-8 rounded-full text-white flex items-center justify-center text-xs font-bold overflow-hidden"
-                        style={{ backgroundColor: brandColor }}
-                      >
-                        {logoUrl ? (
-                          <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
-                        ) : (
-                          agencyName.charAt(0).toUpperCase()
-                        )}
-                      </div>
+            <div className="bg-muted/30 rounded-xl p-6 border flex flex-col items-center justify-center text-center max-w-2xl mx-auto">
+              <div className="bg-card rounded-lg border shadow-sm flex flex-col overflow-hidden w-full max-w-md mx-auto">
+                <div className="h-2 w-full" style={{ backgroundColor: brandColor }} />
+                <div className="p-4 flex-1 flex flex-col">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="space-y-1">
+                      <div className="h-3 w-16 bg-muted rounded" />
+                      <div className="h-4 w-32 bg-muted rounded" />
                     </div>
-                    <div className="grid grid-cols-2 gap-2 mt-auto">
-                      <div className="h-12 bg-muted/50 rounded" />
-                      <div className="h-12 bg-muted/50 rounded" />
+                    <div
+                      className="h-8 w-8 rounded-full text-white flex items-center justify-center text-xs font-bold overflow-hidden"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
+                      ) : (
+                        agencyName.charAt(0).toUpperCase()
+                      )}
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-2 mt-auto">
+                    <div className="h-12 bg-muted/50 rounded" />
+                    <div className="h-12 bg-muted/50 rounded" />
+                  </div>
                 </div>
-                <p className="text-sm font-medium mt-4">Live preview of shared report</p>
-                <p className="text-xs text-muted-foreground mt-1">Updates as you change the color above</p>
               </div>
+              <p className="text-sm font-medium mt-4">Live preview of shared report</p>
+              <p className="text-xs text-muted-foreground mt-1">Updates as you change the color above</p>
             </div>
           </CardContent>
         </Card>
