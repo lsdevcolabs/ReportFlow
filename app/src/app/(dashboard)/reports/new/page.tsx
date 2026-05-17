@@ -69,22 +69,21 @@ export default function TemplateSelectionPage() {
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       {template.description}
                     </p>
-                    {template.metricsConfig.customMetrics.length > 0 && (
+                    {template.tabs[0]?.fields && template.tabs[0].fields.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-3">
-                        {template.metricsConfig.customMetrics
+                        {template.tabs[0].fields
                           .slice(0, 3)
-                          .map((m) => (
+                          .map((f) => (
                             <span
-                              key={m.label}
+                              key={f.key}
                               className="inline-flex items-center text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground"
                             >
-                              {m.label}
+                              {f.label}
                             </span>
                           ))}
-                        {template.metricsConfig.customMetrics.length > 3 && (
+                        {template.tabs[0].fields.length > 3 && (
                           <span className="inline-flex items-center text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">
-                            +{template.metricsConfig.customMetrics.length - 3}{" "}
-                            more
+                            +{template.tabs[0].fields.length - 3} more
                           </span>
                         )}
                       </div>
