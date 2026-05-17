@@ -116,10 +116,7 @@ Write the executive summary paragraph now:
     return Response.json(
       {
         error: "AI_UNAVAILABLE",
-        message:
-          error.message.includes("All API keys")
-            ? "AI generation is temporarily unavailable due to rate limits. Please try again in a few minutes."
-            : "Something went wrong generating the summary. Please try again.",
+        message: error.message || "Something went wrong generating the summary. Please try again.",
       },
       { status: 503 }
     );
