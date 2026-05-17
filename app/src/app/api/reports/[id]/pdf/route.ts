@@ -9,6 +9,7 @@ import { isPdfExportAllowed } from "@/lib/plan-limits";
 import type { Plan } from "@/lib/plan-limits";
 import { ReportPDFDocument } from "@/components/reports/report-pdf";
 import { trackPdfExported } from "@/lib/analytics";
+import { resolveLogoUrl } from "@/lib/resolve-logo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +74,10 @@ export async function GET(
 
     const plan = user.plan as "free" | "starter" | "pro";
 
+    // Resolve logos: migrate base64 → Vercel Blob URL if needed
+    const clientLogoUrl = await resolveLogoUrl(client.logoUrl, "client", client.id);
+    const agencyLogoUrl = await resolveLogoUrl(user.agencyLogoUrl, "agency", user.id);
+
     // BUG 1 FIX: Pre-compute channel breakdown percentages
     const rawMetrics = report.metricsData as Record<string, any>;
     const channelBreakdown = rawMetrics?.channelBreakdown as Array<{ channel: string; sessions: number; percentage?: number }> | undefined;
@@ -95,11 +100,11 @@ export async function GET(
           dateRangeEnd: report.dateRangeEnd.toISOString(),
           metricsData: rawMetrics,
         },
-        client,
+        client: { ...client, logoUrl: clientLogoUrl },
         agency: {
           name: user.agencyName,
           website: user.agencyWebsite,
-          logoUrl: user.agencyLogoUrl,
+          logoUrl: agencyLogoUrl,
           brandColor: user.agencyBrandColor,
         },
         whiteLabel: plan === "pro",

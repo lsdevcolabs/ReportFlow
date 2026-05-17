@@ -4,6 +4,7 @@ import { reports, clients, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { canUseWhiteLabel } from "@/lib/plans";
 import { getUserById } from "@/lib/auth";
+import { resolveLogoUrl } from "@/lib/resolve-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,10 @@ export async function GET(
     const plan = user.plan as "free" | "starter" | "pro";
     const whiteLabel = canUseWhiteLabel(plan);
 
+    // Resolve logos: migrate base64 → Vercel Blob URL if needed
+    const clientLogoUrl = await resolveLogoUrl(client.logoUrl, "client", client.id);
+    const agencyLogoUrl = await resolveLogoUrl(user.agencyLogoUrl, "agency", user.id);
+
     return NextResponse.json({
       report: {
         id: report.id,
@@ -75,11 +80,14 @@ export async function GET(
         shareToken: report.shareToken,
         isPublic: report.isPublic,
         metricsData: report.metricsData as Record<string, unknown>,
-        client,
+        client: {
+          ...client,
+          logoUrl: clientLogoUrl,
+        },
         agency: {
           name: user.agencyName,
           website: user.agencyWebsite,
-          logoUrl: user.agencyLogoUrl,
+          logoUrl: agencyLogoUrl,
           brandColor: user.agencyBrandColor,
           whiteLabel,
         },

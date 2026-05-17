@@ -37,7 +37,19 @@ export async function GET() {
       .from(clients)
       .where(eq(clients.userId, userId));
 
-    return NextResponse.json({ clients: userClients });
+    // Migrate any base64 logos to Vercel Blob URLs (background, non-blocking)
+    const { resolveLogoUrl } = await import("@/lib/resolve-logo");
+    const resolvedClients = await Promise.all(
+      userClients.map(async (client) => {
+        if (client.logoUrl?.startsWith("data:")) {
+          const resolvedUrl = await resolveLogoUrl(client.logoUrl, "client", client.id);
+          return { ...client, logoUrl: resolvedUrl };
+        }
+        return client;
+      })
+    );
+
+    return NextResponse.json({ clients: resolvedClients });
   } catch (error) {
     console.error("[GET /api/clients]", error);
     return NextResponse.json(
@@ -46,6 +58,7 @@ export async function GET() {
     );
   }
 }
+
 
 export async function POST(req: NextRequest) {
   try {

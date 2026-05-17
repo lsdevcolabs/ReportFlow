@@ -47,6 +47,7 @@ interface ReportData {
   client?: {
     name: string;
     brandColor: string;
+    logoUrl?: string | null;
   };
 }
 
@@ -216,12 +217,20 @@ export default function ReportsClient({ initialReports, maxReports, plan }: Repo
                 <CardContent className="p-5">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
-                      <div
-                        className="h-10 w-10 rounded-full flex items-center justify-center text-white font-medium"
-                        style={{ backgroundColor: report.client?.brandColor || "#2563EB" }}
-                      >
-                        {report.client?.name?.charAt(0).toUpperCase() || "R"}
-                      </div>
+                      {report.client?.logoUrl && !report.client.logoUrl.startsWith("data:") ? (
+                        <img
+                          src={report.client.logoUrl}
+                          alt={report.client.name}
+                          className="h-10 w-10 rounded-full object-contain bg-white border shrink-0"
+                        />
+                      ) : (
+                        <div
+                          className="h-10 w-10 rounded-full flex items-center justify-center text-white font-medium shrink-0"
+                          style={{ backgroundColor: report.client?.brandColor || "#2563EB" }}
+                        >
+                          {report.client?.name?.charAt(0).toUpperCase() || "R"}
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm font-medium leading-none">{report.client?.name || "Unknown Client"}</p>
                       </div>

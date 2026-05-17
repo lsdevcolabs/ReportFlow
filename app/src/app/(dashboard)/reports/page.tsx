@@ -52,10 +52,15 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         .where(eq(reports.userId, userId))
         .orderBy(desc(reports.createdAt));
 
-      userReports = rawReports.map((row) => ({
-        ...row.report,
-        client: row.client ? { name: row.client.name, brandColor: row.client.brandColor } : undefined,
-      }));
+      userReports = rawReports.map((row) => {
+        const logoUrl = row.client?.logoUrl;
+        // Only pass blob/http URLs — strip base64 data URIs to avoid bloating SSR payload
+        const safeLogoUrl = logoUrl && !logoUrl.startsWith("data:") ? logoUrl : null;
+        return {
+          ...row.report,
+          client: row.client ? { name: row.client.name, brandColor: row.client.brandColor, logoUrl: safeLogoUrl } : undefined,
+        };
+      });
     }
   } catch (error) {
     console.error("Failed to fetch reports:", error);
