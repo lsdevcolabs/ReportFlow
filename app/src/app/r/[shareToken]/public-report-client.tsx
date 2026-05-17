@@ -328,18 +328,18 @@ export default function PublicReportClient({ shareToken }: { shareToken: string 
           >
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div className="flex flex-wrap items-center gap-4">
-                {report.client.logoUrl ? (
+                {report.client?.logoUrl ? (
                   <img
                     src={report.client.logoUrl}
                     alt={report.client.name}
-                    className="h-12 w-12 object-contain shrink-0"
+                    className="h-12 w-12 shrink-0 rounded-full object-contain bg-white border"
                   />
                 ) : (
                   <div
                     className="h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-white text-lg font-bold"
                     style={{ backgroundColor: brandColor }}
                   >
-                    {report.client.name.charAt(0)}
+                    {report.client.name.charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div>

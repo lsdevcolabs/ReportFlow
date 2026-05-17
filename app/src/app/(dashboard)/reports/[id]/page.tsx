@@ -536,12 +536,20 @@ export default function ReportDetailPage() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <div
-              className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white"
-              style={{ backgroundColor: clientBrandColor }}
-            >
-              {clientName.charAt(0)}
-            </div>
+            {report.client?.logoUrl ? (
+              <img
+                src={report.client.logoUrl}
+                alt={clientName}
+                className="h-10 w-10 shrink-0 rounded-full object-contain bg-white border"
+              />
+            ) : (
+              <div
+                className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white font-bold"
+                style={{ backgroundColor: clientBrandColor }}
+              >
+                {clientName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
               <h1 className="text-2xl font-bold">{report.title}</h1>
               <p className="text-sm text-muted-foreground">

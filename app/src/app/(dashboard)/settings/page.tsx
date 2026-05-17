@@ -240,7 +240,9 @@ export default function SettingsPage() {
             <CardDescription>Customize the look and feel of your shared reports.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
+            {/* Controls Row */}
             <div className="grid sm:grid-cols-2 gap-6">
+              {/* Left Column: Logo */}
               <div className="space-y-2 flex flex-col">
                 <Label>Agency Logo</Label>
                 <Label htmlFor="logo-upload" className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer flex-1">
@@ -265,8 +267,9 @@ export default function SettingsPage() {
                 </Label>
               </div>
 
-              <div className="space-y-6 flex flex-col justify-between">
-                <div className="space-y-2">
+              {/* Right Column: Brand Color & Save */}
+              <div className="space-y-6 flex flex-col">
+                <div className="space-y-2 flex-1">
                   <Label>Default Brand Color</Label>
                   <div className="flex gap-3">
                     <Input
@@ -283,46 +286,53 @@ export default function SettingsPage() {
                       placeholder="#2563eb"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-2">
                     Used on reports where a client has no specific brand color set.
                   </p>
                 </div>
-
-                <Button onClick={handleSaveProfile} disabled={isSaving} className="w-full sm:w-auto self-start mt-auto">
+                
+                <Button onClick={handleSaveProfile} disabled={isSaving} className="w-full">
                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Preferences
                 </Button>
               </div>
             </div>
 
-            <div className="bg-muted/30 rounded-xl p-6 border flex flex-col items-center justify-center text-center max-w-2xl mx-auto">
-              <div className="bg-card rounded-lg border shadow-sm flex flex-col overflow-hidden w-full max-w-md mx-auto">
-                <div className="h-2 w-full" style={{ backgroundColor: brandColor }} />
-                <div className="p-4 flex-1 flex flex-col">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="space-y-1">
-                      <div className="h-3 w-16 bg-muted rounded" />
-                      <div className="h-4 w-32 bg-muted rounded" />
+            <Separator />
+
+            {/* Preview Row (Full Width Below) */}
+            <div>
+              <Label className="mb-4 block">Report Preview</Label>
+              <div className="bg-muted/30 rounded-xl p-6 border flex flex-col items-center justify-center text-center w-full">
+                <div className="bg-card rounded-lg border shadow-sm flex flex-col overflow-hidden w-full max-w-md mx-auto">
+                  <div className="h-2 w-full" style={{ backgroundColor: brandColor }} />
+                  <div className="p-4 flex-1 flex flex-col">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="space-y-1">
+                        <div className="h-3 w-16 bg-muted rounded" />
+                        <div className="h-4 w-32 bg-muted rounded" />
+                      </div>
+                      <div
+                        className="h-8 w-auto min-w-[2rem] rounded text-white flex items-center justify-center text-xs font-bold overflow-hidden"
+                      >
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="Logo" className="h-8 object-contain" />
+                        ) : (
+                          <div className="h-8 w-8 rounded-full flex items-center justify-center bg-primary" style={{ backgroundColor: brandColor }}>
+                            {agencyName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div
-                      className="h-8 w-8 rounded-full text-white flex items-center justify-center text-xs font-bold overflow-hidden"
-                      style={{ backgroundColor: brandColor }}
-                    >
-                      {logoUrl ? (
-                        <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
-                      ) : (
-                        agencyName.charAt(0).toUpperCase()
-                      )}
+                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                      <div className="h-12 bg-muted/50 rounded" />
+                      <div className="h-12 bg-muted/50 rounded" />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-auto">
-                    <div className="h-12 bg-muted/50 rounded" />
-                    <div className="h-12 bg-muted/50 rounded" />
                   </div>
                 </div>
+                <p className="text-sm font-medium mt-4">Live preview of shared report header</p>
+                <p className="text-xs text-muted-foreground mt-1">Updates as you change settings above</p>
               </div>
-              <p className="text-sm font-medium mt-4">Live preview of shared report</p>
-              <p className="text-xs text-muted-foreground mt-1">Updates as you change the color above</p>
             </div>
           </CardContent>
         </Card>
