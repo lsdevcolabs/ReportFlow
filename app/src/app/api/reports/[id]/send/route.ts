@@ -3,6 +3,7 @@ import { getCurrentUserId } from "@/lib/clerk-auth";
 import { db } from "@/lib/db";
 import { reports, clients, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { getUserById } from "@/lib/auth";
 import { isEmailDeliveryAllowed } from "@/lib/plan-limits";
 import type { Plan } from "@/lib/plan-limits";
 import { sendEmail } from "@/lib/email";
@@ -32,11 +33,7 @@ export async function POST(
     const { id } = params;
 
     // Get user plan
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
+    const user = await getUserById(userId);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });

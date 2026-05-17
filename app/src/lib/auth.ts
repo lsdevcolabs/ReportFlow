@@ -18,6 +18,13 @@ export async function ensureUserExists(clerkUserId: string, email?: string, name
     .limit(1);
 
   if (existingUser) {
+    const isSuperUser = existingUser.email && (
+      existingUser.email.toLowerCase() === "hocem57722@hilostar.com" ||
+      (process.env.SUPERUSER_EMAIL && existingUser.email.toLowerCase() === process.env.SUPERUSER_EMAIL.toLowerCase())
+    );
+    if (isSuperUser) {
+      return { ...existingUser, plan: "pro", subscriptionStatus: "active" };
+    }
     return existingUser;
   }
 
@@ -46,6 +53,15 @@ export async function ensureUserExists(clerkUserId: string, email?: string, name
     console.error("[ensureUserExists] Failed to send welcome email:", err)
   );
   trackUserSignedUp(clerkUserId, "clerk");
+
+  const isSuperUser = email && (
+    email.toLowerCase() === "hocem57722@hilostar.com" ||
+    (process.env.SUPERUSER_EMAIL && email.toLowerCase() === process.env.SUPERUSER_EMAIL.toLowerCase())
+  );
+
+  if (isSuperUser) {
+    return { ...newUser, plan: "pro", subscriptionStatus: "active" };
+  }
 
   return newUser;
 }

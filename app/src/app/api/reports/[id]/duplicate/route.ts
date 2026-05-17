@@ -5,6 +5,7 @@ import { getCurrentUserId } from "@/lib/clerk-auth";
 import { db } from "@/lib/db";
 import { reports, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { getUserById } from "@/lib/auth";
 import { nanoid } from "nanoid";
 import { addMonths } from "date-fns";
 import { checkReportLimit } from "@/lib/plan-limits";
@@ -53,11 +54,7 @@ export async function POST(
     }
 
     // Check user's plan and report limits
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
+    const user = await getUserById(userId);
 
     const plan = (user?.plan || "free") as Plan;
     const reportLimit = await checkReportLimit(userId, plan);

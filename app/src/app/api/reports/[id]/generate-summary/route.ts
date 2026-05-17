@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { reports, clients, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { getUserById } from "@/lib/auth";
 import { generateWithGemini } from "@/lib/gemini";
 import { canPerformAction } from "@/lib/plans";
 import { trackAiSummaryGenerated } from "@/lib/analytics";
@@ -17,10 +18,7 @@ export async function POST(
     return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId));
+  const user = await getUserById(userId);
 
   if (!user) {
     return Response.json({ error: "USER_NOT_FOUND" }, { status: 404 });
