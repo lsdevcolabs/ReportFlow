@@ -138,13 +138,12 @@ export default function PublicReportClient({ shareToken }: { shareToken: string 
     </Card>
   );
 
-  // Helper to render a section of metric cards from field definitions
-  const renderMetricSection = (fields: Array<{ key: string; label: string; type: string }>, data: Record<string, unknown>, maxCards?: number) => {
+  const renderMetricSection = (fields: Array<{ key: string; label: string; type: string }>, data: Record<string, unknown>, maxCards?: number, gridClass?: string) => {
     const numericFields = fields.filter((f) => f.type === "number" || f.type === "currency" || f.type === "percentage");
     const displayFields = maxCards ? numericFields.slice(0, maxCards) : numericFields;
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className={gridClass || "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"}>
         {displayFields.map((field) => {
           const val = data[field.key];
           if (val == null || val === "") return null;
@@ -327,26 +326,27 @@ export default function PublicReportClient({ shareToken }: { shareToken: string 
             className="px-6 sm:px-10 py-8 sm:py-12 border-b"
             style={{ borderTopColor: brandColor, borderTopWidth: 4 }}
           >
-            <div className="flex flex-wrap items-center gap-4 mb-6">
-              {report.client.logoUrl ? (
-                <img
-                  src={report.client.logoUrl}
-                  alt={report.client.name}
-                  className="h-12 w-12 object-contain"
-                />
-              ) : (
-                <div
-                  className="h-12 w-12 rounded-full flex items-center justify-center text-white text-lg font-bold"
-                  style={{ backgroundColor: brandColor }}
-                >
-                  {report.client.name.charAt(0)}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div className="flex flex-wrap items-center gap-4">
+                {report.client.logoUrl ? (
+                  <img
+                    src={report.client.logoUrl}
+                    alt={report.client.name}
+                    className="h-12 w-12 object-contain shrink-0"
+                  />
+                ) : (
+                  <div
+                    className="h-12 w-12 shrink-0 rounded-full flex items-center justify-center text-white text-lg font-bold"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    {report.client.name.charAt(0)}
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">{report.client.name}</p>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{report.title}</h1>
                 </div>
-              )}
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">{report.client.name}</p>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{report.title}</h1>
               </div>
-            </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-1.5">
@@ -479,7 +479,9 @@ export default function PublicReportClient({ shareToken }: { shareToken: string 
                           { key: "googleConversions", label: "Conversions", type: "number" },
                           { key: "googleRoas", label: "ROAS", type: "number" },
                         ],
-                        md
+                        md,
+                        undefined,
+                        "grid grid-cols-2 sm:grid-cols-3 gap-4"
                       )}
                     </CardContent>
                   </Card>
@@ -496,7 +498,9 @@ export default function PublicReportClient({ shareToken }: { shareToken: string 
                           { key: "metaConversions", label: "Conversions", type: "number" },
                           { key: "metaRoas", label: "ROAS", type: "number" },
                         ],
-                        md
+                        md,
+                        undefined,
+                        "grid grid-cols-2 sm:grid-cols-3 gap-4"
                       )}
                     </CardContent>
                   </Card>

@@ -352,12 +352,12 @@ export default function ReportDetailPage() {
     </Card>
   );
 
-  const renderMetricSection = (fields: Array<{ key: string; label: string; type: string }>, data: Record<string, unknown>, maxCards?: number) => {
+  const renderMetricSection = (fields: Array<{ key: string; label: string; type: string }>, data: Record<string, unknown>, maxCards?: number, gridClass?: string) => {
     const numericFields = fields.filter((f) => f.type === "number" || f.type === "currency" || f.type === "percentage");
     const displayFields = maxCards ? numericFields.slice(0, maxCards) : numericFields;
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={gridClass || "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"}>
         {displayFields.map((field) => {
           const val = data[field.key];
           if (val == null || val === "") return null;
@@ -528,7 +528,7 @@ export default function ReportDetailPage() {
 
   return (
     <div className="p-8 space-y-8 max-w-5xl mx-auto">
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row md:flex-wrap items-start md:items-center justify-between gap-4">
         <Link href="/reports">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
@@ -537,7 +537,7 @@ export default function ReportDetailPage() {
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <div
-              className="h-10 w-10 rounded-full flex items-center justify-center text-white"
+              className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-white"
               style={{ backgroundColor: clientBrandColor }}
             >
               {clientName.charAt(0)}
@@ -767,7 +767,9 @@ export default function ReportDetailPage() {
                     { key: "googleConversions", label: "Conversions", type: "number" },
                     { key: "googleRoas", label: "ROAS", type: "number" },
                   ],
-                  md
+                  md,
+                  undefined,
+                  "grid grid-cols-2 sm:grid-cols-3 gap-4"
                 )}
               </CardContent>
             </Card>
@@ -784,7 +786,9 @@ export default function ReportDetailPage() {
                     { key: "metaConversions", label: "Conversions", type: "number" },
                     { key: "metaRoas", label: "ROAS", type: "number" },
                   ],
-                  md
+                  md,
+                  undefined,
+                  "grid grid-cols-2 sm:grid-cols-3 gap-4"
                 )}
               </CardContent>
             </Card>
