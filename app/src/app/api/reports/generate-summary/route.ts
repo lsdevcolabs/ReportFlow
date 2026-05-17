@@ -66,38 +66,26 @@ export async function POST(req: Request) {
   const prompt = `
 You are a professional digital marketing analyst writing an executive summary for a client performance report.
 
-RULES:
-- Write exactly 3 to 5 sentences. No more, no less.
-- Use the exact numbers provided. Do not invent or round numbers unless they are already rounded.
+RULES for the Summary:
+- Provide a highly structured and professional summary using Markdown formatting.
+- Structure your response into exactly three sections:
+  1. **Executive Overview**: A brief introductory paragraph summarizing overall performance.
+  2. **Key Highlights**: A bulleted list of 3-4 significant metrics or wins (use bold text for the metric names).
+  3. **Strategic Outlook**: A short, forward-looking conclusion or recommendation for the next period.
+- Use the exact numbers provided in the data. Do not invent or hallucinate data.
 - Tone: professional, positive, and client-friendly. Clients read this — make them feel their investment is working.
-- If a metric shows a decline (negative % change), acknowledge it briefly and frame it constructively, e.g. "We are actively optimizing X to address the decline."
-- Do NOT use bullet points, headers, bold text, or any markdown formatting.
-- Output ONLY the paragraph. No preamble like "Here is your summary:" or "Sure!".
-- End the last sentence with a forward-looking statement about the next steps or what to focus on next period.
+- If a metric shows a decline, acknowledge it briefly and frame it constructively.
+- Do NOT include any filler preamble like "Here is your summary". Output the markdown directly.
 
-REPORT DATA:
+REPORT CONTEXT:
 Report Title: ${title ?? "Performance Report"}
 Client: ${clientName}
 Reporting Period: ${dateStart} to ${dateEnd}
 
-TRAFFIC:
-- Organic Traffic: ${m?.summary?.organicTraffic ?? "N/A"}${m?.summary?.previousOrganic ? ` (previous period: ${m.summary.previousOrganic})` : ""}
-- Paid Traffic: ${m?.summary?.paidTraffic ?? "N/A"}
-- Total Sessions: ${(m?.summary?.organicTraffic ?? 0) + (m?.summary?.paidTraffic ?? 0)}
+PERFORMANCE METRICS (JSON DATA):
+${JSON.stringify(m, null, 2)}
 
-CONVERSIONS:
-- Conversions: ${m?.summary?.conversions ?? "N/A"}${m?.summary?.previousConversions ? ` (previous period: ${m.summary.previousConversions})` : ""}
-- Revenue: ${m?.summary?.revenue ? `$${m.summary.revenue}` : "N/A"}
-- Bounce Rate: ${m?.summary?.bounceRate ? `${m.summary.bounceRate}%` : "N/A"}
-
-PAID ADS:
-- Ad Spend: ${m?.summary?.adSpend ? `$${m.summary.adSpend}` : "N/A"}
-- ROAS: ${m?.summary?.roas ? `${m.summary.roas}x` : "N/A"}
-- CTR: ${m?.summary?.ctr ? `${m.summary.ctr}%` : "N/A"}
-
-${customMetricsList ? `CUSTOM METRICS:\n${customMetricsList}` : ""}
-
-Write the executive summary paragraph now:
+Write the structured executive summary now:
 `.trim();
 
   try {
