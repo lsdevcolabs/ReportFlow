@@ -656,7 +656,7 @@ export default function ReportDetailPage() {
       {renderMetricSection(templateFields.heroFields, md, 4)}
 
       {/* General: Channel Breakdown */}
-      {templateType === "general" && md.channels && Array.isArray(md.channels) && (md.channels as unknown[]).length > 0 && (
+      {templateType === "general" && Boolean(md.channels) && Array.isArray(md.channels) && (md.channels as unknown[]).length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Channel Breakdown</CardTitle>
@@ -709,7 +709,7 @@ export default function ReportDetailPage() {
       )}
 
       {/* SEO: Keyword Rankings Table */}
-      {templateType === "seo" && md.keywordRows && Array.isArray(md.keywordRows) && (md.keywordRows as unknown[]).length > 0 && (
+      {templateType === "seo" && Boolean(md.keywordRows) && Array.isArray(md.keywordRows) && (md.keywordRows as unknown[]).length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Keyword Rankings</CardTitle>
@@ -795,7 +795,7 @@ export default function ReportDetailPage() {
           </div>
 
           {/* Campaign Performance Table */}
-          {md.campaignRows && Array.isArray(md.campaignRows) && (md.campaignRows as unknown[]).length > 0 && (
+          {Boolean(md.campaignRows) && Array.isArray(md.campaignRows) && (md.campaignRows as unknown[]).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Campaign Performance</CardTitle>
@@ -812,7 +812,7 @@ export default function ReportDetailPage() {
       )}
 
       {/* Social Media: Platform Metrics */}
-      {templateType === "socialMedia" && md.enabledPlatforms && (
+      {templateType === "socialMedia" && Boolean(md.enabledPlatforms) && (
         <>
           {/* Per-platform cards */}
           {[
@@ -868,7 +868,7 @@ export default function ReportDetailPage() {
           })}
 
           {/* Content Performance Table */}
-          {md.contentRows && Array.isArray(md.contentRows) && (md.contentRows as unknown[]).length > 0 && (
+          {Boolean(md.contentRows) && Array.isArray(md.contentRows) && (md.contentRows as unknown[]).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Content Performance</CardTitle>
