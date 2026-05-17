@@ -1,158 +1,129 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/clerk-auth";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { clients } from "@/lib/db/schema";
+import { clients, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { isAiSummaryAllowed } from "@/lib/plan-limits";
-import type { Plan } from "@/lib/plan-limits";
-import { getUserById } from "@/lib/auth";
-import Anthropic from "@anthropic-ai/sdk";
+import { generateWithGemini } from "@/lib/gemini";
+import { canPerformAction } from "@/lib/plans";
+import { trackAiSummaryGenerated } from "@/lib/analytics";
 
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const anthropic = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  : null;
+export async function POST(req: Request) {
+  const { userId } = auth();
+  if (!userId) {
+    return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
 
-export async function POST(req: NextRequest) {
-  try {
-    const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId));
 
-    const user = await getUserById(userId);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+  if (!user) {
+    return Response.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+  }
 
-    const plan = (user.plan || "free") as Plan;
+  if (!canPerformAction(user.plan, "aiSummary")) {
+    return Response.json(
+      {
+        error: "PLAN_LIMIT_REACHED",
+        message: "AI summary generation is available on Starter and Pro plans.",
+        upgradeUrl: "/upgrade",
+      },
+      { status: 403 }
+    );
+  }
 
-    // Check if AI summary is allowed
-    if (!isAiSummaryAllowed(plan)) {
-      return NextResponse.json(
-        {
-          error: "UPGRADE_REQUIRED",
-          message: "AI-generated summaries require a Starter or Pro plan.",
-          upgradeUrl: "/upgrade",
-        },
-        { status: 403 }
-      );
-    }
+  const body = await req.json();
+  const { clientId, title, dateRangeStart, dateRangeEnd, metricsData } = body;
 
-    if (!anthropic) {
-      return NextResponse.json(
-        { error: "AI_NOT_CONFIGURED", message: "AI service is not configured." },
-        { status: 503 }
-      );
-    }
+  if (!clientId) {
+    return Response.json(
+      { error: "VALIDATION_ERROR", message: "clientId is required" },
+      { status: 400 }
+    );
+  }
 
-    const body = await req.json();
-    const { clientId, title, dateRangeStart, dateRangeEnd, metricsData } = body;
+  const [client] = await db
+    .select()
+    .from(clients)
+    .where(eq(clients.id, clientId))
+    .limit(1);
 
-    if (!clientId) {
-      return NextResponse.json(
-        { error: "VALIDATION_ERROR", message: "clientId is required" },
-        { status: 400 }
-      );
-    }
+  const clientName = client?.name || "Client";
+  const m = metricsData || {};
 
-    // Fetch client
-    const [client] = await db
-      .select()
-      .from(clients)
-      .where(eq(clients.id, clientId))
-      .limit(1);
+  const dateStart = dateRangeStart
+    ? new Date(dateRangeStart).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "N/A";
+  const dateEnd = dateRangeEnd
+    ? new Date(dateRangeEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "N/A";
 
-    const clientName = client?.name || "the client";
+  const customMetricsList = (m?.customMetrics ?? [])
+    .filter((km: any) => km.label && km.value)
+    .map((km: any) => `- ${km.label}: ${km.value}${km.change ? ` (${km.change})` : ""}`)
+    .join("\n");
 
-    // Build the prompt
-    const dateRange = dateRangeStart && dateRangeEnd
-      ? `${new Date(dateRangeStart).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} - ${new Date(dateRangeEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
-      : "the selected period";
+  const prompt = `
+You are a professional digital marketing analyst writing an executive summary for a client performance report.
 
-    let metricsContext = "";
-    if (metricsData?.summary) {
-      const s = metricsData.summary;
-      metricsContext += `\n- Total sessions: ${s.sessions ?? "N/A"}`;
-      metricsContext += `\n- Conversions: ${s.conversions ?? "N/A"}`;
-      if (s.revenue) metricsContext += `\n- Revenue: $${s.revenue.toLocaleString()}`;
-      if (s.previousSessions) {
-        const change = s.sessions
-          ? Math.round(((s.sessions - s.previousSessions) / s.previousSessions) * 100)
-          : null;
-        metricsContext += `\n- Previous period sessions: ${s.previousSessions}`;
-        if (change !== null) metricsContext += `\n- Session change: ${change >= 0 ? "+" : ""}${change}%`;
-      }
-    }
-    if (metricsData?.channelBreakdown?.length) {
-      metricsContext += "\n\nChannel breakdown:";
-      for (const ch of metricsData.channelBreakdown) {
-        metricsContext += `\n- ${ch.channel}: ${ch.sessions} sessions`;
-      }
-    }
-    if (metricsData?.customMetrics?.length) {
-      metricsContext += "\n\nAdditional metrics:";
-      for (const m of metricsData.customMetrics) {
-        metricsContext += `\n- ${m.label}: ${m.value}`;
-        if (m.change) metricsContext += ` (${m.change})`;
-      }
-    }
+RULES:
+- Write exactly 3 to 5 sentences. No more, no less.
+- Use the exact numbers provided. Do not invent or round numbers unless they are already rounded.
+- Tone: professional, positive, and client-friendly. Clients read this — make them feel their investment is working.
+- If a metric shows a decline (negative % change), acknowledge it briefly and frame it constructively, e.g. "We are actively optimizing X to address the decline."
+- Do NOT use bullet points, headers, bold text, or any markdown formatting.
+- Output ONLY the paragraph. No preamble like "Here is your summary:" or "Sure!".
+- End the last sentence with a forward-looking statement about the next steps or what to focus on next period.
 
-    const prompt = `You are a marketing analyst writing an executive summary for a client report.
-
+REPORT DATA:
+Report Title: ${title ?? "Performance Report"}
 Client: ${clientName}
-Report period: ${dateRange}
-Report title: ${title || "Performance Report"}
+Reporting Period: ${dateStart} to ${dateEnd}
 
-Performance data:${metricsContext}
+TRAFFIC:
+- Organic Traffic: ${m?.summary?.organicTraffic ?? "N/A"}${m?.summary?.previousOrganic ? ` (previous period: ${m.summary.previousOrganic})` : ""}
+- Paid Traffic: ${m?.summary?.paidTraffic ?? "N/A"}
+- Total Sessions: ${(m?.summary?.organicTraffic ?? 0) + (m?.summary?.paidTraffic ?? 0)}
 
-Write a concise, professional executive summary (3-5 sentences) that:
-1. Highlights the key performance outcomes
-2. Notes significant trends or changes compared to the previous period
-3. Uses a positive, professional tone appropriate for client communication
-4. Avoids jargon — keep it accessible
+CONVERSIONS:
+- Conversions: ${m?.summary?.conversions ?? "N/A"}${m?.summary?.previousConversions ? ` (previous period: ${m.summary.previousConversions})` : ""}
+- Revenue: ${m?.summary?.revenue ? `$${m.summary.revenue}` : "N/A"}
+- Bounce Rate: ${m?.summary?.bounceRate ? `${m.summary.bounceRate}%` : "N/A"}
 
-Do not include a greeting or sign-off. Just write the summary paragraph directly.`;
+PAID ADS:
+- Ad Spend: ${m?.summary?.adSpend ? `$${m.summary.adSpend}` : "N/A"}
+- ROAS: ${m?.summary?.roas ? `${m.summary.roas}x` : "N/A"}
+- CTR: ${m?.summary?.ctr ? `${m.summary.ctr}%` : "N/A"}
 
-    // Stream the response
-    const stream = await anthropic.messages.stream({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
-    });
+${customMetricsList ? `CUSTOM METRICS:\n${customMetricsList}` : ""}
 
-    // Create a ReadableStream for the response
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const event of stream) {
-            if (
-              event.type === "content_block_delta" &&
-              event.delta.type === "text_delta"
-            ) {
-              controller.enqueue(new TextEncoder().encode(event.delta.text));
-            }
-          }
-          controller.close();
-        } catch (error) {
-          console.error("[AI Summary Stream Error]", error);
-          controller.error(error);
-        }
+Write the executive summary paragraph now:
+`.trim();
+
+  try {
+    const summary = await generateWithGemini(prompt);
+
+    trackAiSummaryGenerated(userId, "new");
+
+    return Response.json(
+      { summary },
+      { status: 200 }
+    );
+
+  } catch (error: any) {
+    console.error("[generate-summary] Error:", error.message);
+
+    return Response.json(
+      {
+        error: "AI_UNAVAILABLE",
+        message:
+          error.message.includes("All API keys")
+            ? "AI generation is temporarily unavailable due to rate limits. Please try again in a few minutes."
+            : "Something went wrong generating the summary. Please try again.",
       },
-    });
-
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Transfer-Encoding": "chunked",
-      },
-    });
-  } catch (error) {
-    console.error("[POST /api/reports/generate-summary]", error);
-    return NextResponse.json(
-      { error: "INTERNAL_SERVER_ERROR" },
-      { status: 500 }
+      { status: 503 }
     );
   }
 }

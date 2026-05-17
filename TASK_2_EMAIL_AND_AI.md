@@ -128,7 +128,7 @@ Resend must be configured with a verified domain (e.g., `reportflow.io`) so emai
 ## FEATURE 5 — AI-Generated Executive Summary
 
 ### What to Build
-A "✨ Generate with AI" button next to the Executive Summary textarea in the report builder. When clicked, it sends the report's metric data to Claude Haiku and streams back a professional 3-5 sentence summary that appears character-by-character in the textarea.
+A "✨ Generate with AI" button next to the Executive Summary textarea in the report builder. When clicked, it sends the report's metric data to Google Gemini and populates a professional 3-5 sentence summary in the textarea.
 
 ### Files to Create
 - `app/src/app/api/reports/[id]/generate-summary/route.ts` — POST route that streams AI response
@@ -139,29 +139,16 @@ A "✨ Generate with AI" button next to the Executive Summary textarea in the re
 
 ### API Route (`app/api/reports/[id]/generate-summary/route.ts`)
 
-Install: `npm install @anthropic-ai/sdk`
+Install: `npm install @google/generative-ai`
 
 1. Authenticate via Clerk
 2. Check plan gating — Free plan users get `403`
 3. Fetch report + client data, verify ownership
 4. Build the user message with ALL metric data (traffic, conversions, paid ads, custom KPIs)
-5. Call Claude Haiku (`claude-haiku-4-5-20251001`) with streaming enabled
-6. System prompt (hardcoded):
-   ```
-   You are a professional digital marketing analyst writing an executive summary
-   for a client performance report.
-   Rules:
-   - Write exactly 3-5 sentences.
-   - Use the specific numbers from the data. Do not invent numbers.
-   - Tone: professional, positive, client-friendly. Focus on wins and growth.
-   - If a metric shows decline, acknowledge briefly and frame constructively.
-   - No bullet points, headers, or markdown.
-   - Output ONLY the paragraph — no preamble.
-   - End with a forward-looking sentence about next steps.
-   ```
-7. Return as a `ReadableStream` so the frontend can stream the text
+5. Call Gemini (`gemini-2.0-flash-lite`) with 3-key rotation + fallback
+6. Return JSON `{ summary: "..." }` — no streaming needed
 
-### Frontend — Streaming into Textarea
+### Frontend — JSON Response (no streaming)
 
 ```typescript
 async function handleGenerateSummary() {
@@ -169,6 +156,7 @@ async function handleGenerateSummary() {
   setNotes(''); // Clear existing text
 
   const response = await fetch(`/api/reports/${reportId}/generate-summary`, { method: 'POST' });
+  const data = await response.json();
 
   if (response.status === 403) {
     setShowUpgradePrompt(true);
@@ -176,14 +164,14 @@ async function handleGenerateSummary() {
     return;
   }
 
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
+  if (response.status === 503 || !response.ok) {
+    toast.error(data.message ?? 'AI generation failed. Please try again.');
+    setIsGenerating(false);
+    return;
+  }
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value);
-    setNotes(prev => prev + chunk);
+  if (data.summary) {
+    setNotes(data.summary);
   }
 
   setIsGenerating(false);
@@ -193,7 +181,7 @@ async function handleGenerateSummary() {
 **UI Details:**
 - Button: "✨ Generate with AI" — small, secondary style (wand/sparkle icon, blue/purple text, not filled)
 - Loading state: "Generating..." with spinner
-- Textarea shows blinking cursor placeholder while generating
+- Textarea populated with full summary when ready
 - User can freely edit the generated text after completion
 - On Free plan: show inline upgrade prompt below textarea (NOT a modal)
   - Text: "AI Summary is available on Starter ($9/mo) and Pro ($29/mo) plans. [Upgrade →]"
@@ -208,7 +196,9 @@ pro: { aiSummary: true, ... }
 
 ### Environment Variables Needed
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY_1=your_key_1
+GEMINI_API_KEY_2=your_key_2
+GEMINI_API_KEY_3=your_key_3
 ```
 
 ---
@@ -250,7 +240,7 @@ Ensure `canPerformAction(plan, action)` function handles both new action types.
    - Test with draft report → should be blocked
 2. **AI Summary**:
    - Test Free plan → should show inline upgrade prompt
-   - Test Starter/Pro → click Generate → verify text streams into textarea character by character
+   - Test Starter/Pro → click Generate → verify text populates textarea
    - Verify generated text uses actual numbers from the report
    - Verify text can be edited after generation
 
@@ -259,7 +249,7 @@ Ensure `canPerformAction(plan, action)` function handles both new action types.
 ## Dependencies
 - `resend` npm package
 - `@react-email/components` npm package
-- `@anthropic-ai/sdk` npm package
+- `@google/generative-ai` npm package
 - `date-fns` (already installed)
 
 ---

@@ -3,11 +3,11 @@
 import { useState, Suspense, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Save, Upload, Eye, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Upload, Eye, Loader2, Sparkles } from "lucide-react";
+import { getTemplate, type TemplateType } from "@/lib/templates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,68 +17,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GeneralMarketingForm } from "@/components/reports/general-marketing-form";
+import { SeoForm } from "@/components/reports/seo-form";
+import { PaidAdsForm } from "@/components/reports/paid-ads-form";
+import { SocialMediaForm } from "@/components/reports/social-media-form";
 
 interface Client {
   id: string;
   name: string;
   brandColor: string | null;
 }
-
-interface ReportFormData {
-  clientId: string;
-  title: string;
-  dateRangeStart: string;
-  dateRangeEnd: string;
-  isPublic: boolean;
-  // Traffic metrics
-  organicTraffic: number | null;
-  paidTraffic: number | null;
-  previousOrganicTraffic: number | null;
-  // Conversion metrics
-  conversions: number | null;
-  conversionRate: number | null;
-  previousConversions: number | null;
-  // Paid ads metrics
-  spend: number | null;
-  roas: number | null;
-  impressions: number | null;
-  clicks: number | null;
-  ctr: number | null;
-  // Audience metrics
-  socialFollowers: number | null;
-  socialEngagement: number | null;
-  emailSubscribers: number | null;
-  emailOpenRate: number | null;
-  // Notes
-  notes: string;
-}
-
-const initialFormData: ReportFormData = {
-  clientId: "",
-  title: "",
-  dateRangeStart: "",
-  dateRangeEnd: "",
-  isPublic: false,
-  organicTraffic: null,
-  paidTraffic: null,
-  previousOrganicTraffic: null,
-  conversions: null,
-  conversionRate: null,
-  previousConversions: null,
-  spend: null,
-  roas: null,
-  impressions: null,
-  clicks: null,
-  ctr: null,
-  socialFollowers: null,
-  socialEngagement: null,
-  emailSubscribers: null,
-  emailOpenRate: null,
-  notes: "",
-};
 
 export default function EditReportPage() {
   return (
@@ -108,154 +58,47 @@ function EditReportPageContent() {
   const params = useParams();
   const router = useRouter();
   const reportId = params.id as string;
-  
+
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);
   const [loadingReport, setLoadingReport] = useState(true);
-  
-  const [formData, setFormData] = useState<ReportFormData>(initialFormData);
+
+  const [clientId, setClientId] = useState("");
+  const [title, setTitle] = useState("");
+  const [templateType, setTemplateType] = useState<TemplateType>("general");
+  const [dateRangeStart, setDateRangeStart] = useState("");
+  const [dateRangeEnd, setDateRangeEnd] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
+  const [metricsData, setMetricsData] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState("traffic");
-  const [importedCsvData, setImportedCsvData] = useState<Record<string, string>[] | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
-  const applyCsvDataForClient = (clientId: string, csvRows: Record<string, string>[]) => {
-    const selectedClient = clients.find((c) => c.id === clientId);
-    if (!selectedClient) return;
-
-    const clientName = selectedClient.name.toLowerCase();
-    const matchedRow = csvRows.find(
-      (row) =>
-        (row["client"] && row["client"].toLowerCase() === clientName) ||
-        (row["client name"] && row["client name"].toLowerCase() === clientName)
-    ) || (csvRows.length === 1 && !csvRows[0]["client"] && !csvRows[0]["client name"] ? csvRows[0] : null);
-
-    if (!matchedRow) {
-      alert(`No data found for client "${selectedClient.name}" in the uploaded CSV.`);
-      return;
-    }
-
-    const metricKeyMapping: Record<string, keyof ReportFormData> = {
-      "organic traffic": "organicTraffic",
-      "previous period organic": "previousOrganicTraffic",
-      "paid traffic": "paidTraffic",
-      "total conversions": "conversions",
-      "conversion rate (%)": "conversionRate",
-      "previous period conversions": "previousConversions",
-      "ad spend ($)": "spend",
-      "roas": "roas",
-      "impressions": "impressions",
-      "clicks": "clicks",
-      "ctr (%)": "ctr",
-      "social followers": "socialFollowers",
-      "social engagement (%)": "socialEngagement",
-      "email subscribers": "emailSubscribers",
-      "email open rate (%)": "emailOpenRate",
-    };
-
-    const cleanValue = (val: string) => {
-      const cleaned = val.replace(/[$,%]/g, "");
-      return parseFloat(cleaned);
-    };
-
-    setFormData((prev) => {
-      const newData = { ...prev, clientId };
-      let updated = false;
-
-      Object.keys(matchedRow).forEach((header) => {
-        const valStr = matchedRow[header];
-        if (!valStr) return;
-
-        let key = metricKeyMapping[header] as keyof ReportFormData | undefined;
-        if (!key) {
-          const matchingKey = Object.keys(newData).find(k => k.toLowerCase() === header);
-          if (matchingKey) {
-            key = matchingKey as keyof ReportFormData;
-          }
-        }
-
-        if (key) {
-          const val = cleanValue(valStr);
-          if (!isNaN(val)) {
-            (newData as any)[key] = val;
-            updated = true;
-          }
-        } else if (header === "report title" || header === "reporttitle" || header === "title") {
-          newData.title = valStr;
-          updated = true;
-        } else if (header === "start date" || header === "startdate") {
-          const d = new Date(valStr);
-          if (!isNaN(d.getTime())) {
-            newData.dateRangeStart = d.toISOString().split("T")[0];
-            updated = true;
-          }
-        } else if (header === "end date" || header === "enddate") {
-          const d = new Date(valStr);
-          if (!isNaN(d.getTime())) {
-            newData.dateRangeEnd = d.toISOString().split("T")[0];
-            updated = true;
-          }
-        }
-      });
-
-      if (updated) {
-        setTimeout(() => alert(`CSV data applied for client "${selectedClient.name}".`), 0);
-        return newData;
-      } else {
-        setTimeout(() => alert(`Data found for "${selectedClient.name}", but no valid metrics were recognized.`), 0);
-        return prev;
-      }
-    });
-  };
+  const template = getTemplate(templateType);
 
   useEffect(() => {
     async function fetchData() {
       try {
         const [clientsRes, reportRes] = await Promise.all([
           fetch("/api/clients"),
-          fetch(`/api/reports/${reportId}`)
+          fetch(`/api/reports/${reportId}`),
         ]);
-        
+
         if (clientsRes.ok) {
           const data = await clientsRes.json();
           setClients(data.clients || []);
         }
-        
+
         if (reportRes.ok) {
           const data = await reportRes.json();
           if (data.report) {
             const r = data.report;
-            const md = r.metricsData || {};
-            const summary = md.summary || {};
-            const organicChan = (md.channelBreakdown || []).find((c: any) => c.channel === "Organic");
-            const paidChan = (md.channelBreakdown || []).find((c: any) => c.channel === "Paid");
-            const getMetric = (label: string) => {
-              const m = (md.customMetrics || []).find((x: any) => x.label === label);
-              return m ? parseFloat(m.value.replace(/[^0-9.]/g, '')) : null;
-            };
-
-            setFormData({
-              clientId: r.clientId,
-              title: r.title,
-              dateRangeStart: r.dateRangeStart ? new Date(r.dateRangeStart).toISOString().split("T")[0] : "",
-              dateRangeEnd: r.dateRangeEnd ? new Date(r.dateRangeEnd).toISOString().split("T")[0] : "",
-              isPublic: r.isPublic,
-              organicTraffic: organicChan ? organicChan.sessions : null,
-              paidTraffic: paidChan ? paidChan.sessions : null,
-              previousOrganicTraffic: summary.previousSessions || null,
-              conversions: summary.conversions || null,
-              conversionRate: null,
-              previousConversions: summary.previousConversions || null,
-              spend: getMetric("Ad Spend"),
-              roas: getMetric("ROAS"),
-              impressions: null,
-              clicks: null,
-              ctr: null,
-              socialFollowers: getMetric("Social Followers"),
-              socialEngagement: null,
-              emailSubscribers: getMetric("Email Subscribers"),
-              emailOpenRate: null,
-              notes: md.notes || "",
-            });
+            setClientId(r.clientId);
+            setTitle(r.title);
+            setTemplateType((r.templateType || "general") as TemplateType);
+            setDateRangeStart(r.dateRangeStart ? new Date(r.dateRangeStart).toISOString().split("T")[0] : "");
+            setDateRangeEnd(r.dateRangeEnd ? new Date(r.dateRangeEnd).toISOString().split("T")[0] : "");
+            setIsPublic(r.isPublic);
+            setMetricsData(r.metricsData || {});
           }
         }
       } catch (e) {
@@ -268,41 +111,64 @@ function EditReportPageContent() {
     fetchData();
   }, [reportId]);
 
-  const updateField = <K extends keyof ReportFormData>(field: K, value: ReportFormData[K]) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleGenerateAiSummary = async () => {
+    if (!clientId) {
+      alert("Please select a client first.");
+      return;
+    }
+
+    setIsGeneratingSummary(true);
+    setMetricsData((prev) => ({ ...prev, executiveSummary: "" }));
+
+    try {
+      const res = await fetch(`/api/reports/${reportId}/generate-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId,
+          title: title || "Untitled Report",
+          dateRangeStart,
+          dateRangeEnd,
+          metricsData,
+          templateType,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.status === 403) {
+        alert("AI-generated summaries require a Starter or Pro plan. Please upgrade to continue.");
+        return;
+      }
+
+      if (res.status === 503 || !res.ok) {
+        alert(data.message ?? "AI generation failed. Please try again.");
+        return;
+      }
+
+      if (data.summary) {
+        setMetricsData((prev) => ({ ...prev, executiveSummary: data.summary }));
+      }
+    } catch (e) {
+      console.error("Failed to generate AI summary:", e);
+      alert("Something went wrong. Please check your connection and try again.");
+    } finally {
+      setIsGeneratingSummary(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       const payload = {
-        clientId: formData.clientId,
-        title: formData.title,
-        dateRangeStart: formData.dateRangeStart,
-        dateRangeEnd: formData.dateRangeEnd,
-        isPublic: formData.isPublic,
-        metricsData: {
-          summary: {
-            sessions: (formData.organicTraffic || 0) + (formData.paidTraffic || 0),
-            conversions: formData.conversions || 0,
-            previousSessions: formData.previousOrganicTraffic || 0,
-            previousConversions: formData.previousConversions || 0,
-            revenue: formData.spend ? (formData.roas ? formData.spend * formData.roas : 0) : undefined,
-          },
-          channelBreakdown: [
-            { channel: "Organic", sessions: formData.organicTraffic || 0 },
-            { channel: "Paid", sessions: formData.paidTraffic || 0 }
-          ].filter(c => c.sessions > 0),
-          customMetrics: [
-            { label: "Ad Spend", value: `$${formData.spend || 0}` },
-            { label: "ROAS", value: `${formData.roas || 0}x` },
-            { label: "Social Followers", value: `${formData.socialFollowers || 0}` },
-            { label: "Email Subscribers", value: `${formData.emailSubscribers || 0}` }
-          ].filter(m => m.value !== "$0" && m.value !== "0x" && m.value !== "0"),
-          notes: formData.notes
-        }
+        title,
+        templateType,
+        dateRangeStart,
+        dateRangeEnd,
+        isPublic,
+        metricsData,
       };
 
       const res = await fetch(`/api/reports/${reportId}`, {
@@ -315,12 +181,12 @@ function EditReportPageContent() {
         router.push(`/reports/${reportId}`);
       } else {
         const errorData = await res.json();
-        console.error("Failed to create report:", errorData);
-        alert(`Failed to create report: ${errorData.error || errorData.message || "Unknown error"}`);
+        console.error("Failed to update report:", errorData);
+        alert(`Failed to update report: ${errorData.error || errorData.message || "Unknown error"}`);
       }
     } catch (e) {
-      console.error("Error creating report:", e);
-      alert("An unexpected error occurred while creating the report.");
+      console.error("Error updating report:", e);
+      alert("An unexpected error occurred while updating the report.");
     } finally {
       setIsSubmitting(false);
     }
@@ -336,39 +202,38 @@ function EditReportPageContent() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (!text) return;
-      
-      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+      const lines = text.split("\n").map((line) => line.trim()).filter((line) => line);
       if (lines.length < 2) {
         alert("Invalid CSV format. Need headers and at least one row of data.");
         return;
       }
-      
+
       const parseCsvLine = (text: string) => {
         const result = [];
-        let current = '';
+        let current = "";
         let inQuotes = false;
         for (let i = 0; i < text.length; i++) {
           const char = text[i];
-          if (char === '"' && text[i+1] === '"') {
+          if (char === '"' && text[i + 1] === '"') {
             current += '"';
-            i++; 
+            i++;
           } else if (char === '"') {
             inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
+          } else if (char === "," && !inQuotes) {
             result.push(current);
-            current = '';
+            current = "";
           } else {
             current += char;
           }
         }
         result.push(current);
-        return result.map(s => s.trim());
+        return result.map((s) => s.trim());
       };
 
       let rows: Record<string, string>[] = [];
       const firstLineParts = parseCsvLine(lines[0].toLowerCase());
       if (firstLineParts.includes("metric") && firstLineParts.includes("value")) {
-        // Vertical format
         const rowData: Record<string, string> = {};
         for (let i = 1; i < lines.length; i++) {
           const parts = parseCsvLine(lines[i]);
@@ -378,8 +243,7 @@ function EditReportPageContent() {
         }
         rows = [rowData];
       } else {
-        // Horizontal format
-        const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+        const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
         for (let i = 1; i < lines.length; i++) {
           const values = parseCsvLine(lines[i]);
           const rowData: Record<string, string> = {};
@@ -389,36 +253,110 @@ function EditReportPageContent() {
           rows.push(rowData);
         }
       }
-      
-      setImportedCsvData(rows);
-      if (formData.clientId) {
-        applyCsvDataForClient(formData.clientId, rows);
-      } else {
-        alert("CSV uploaded successfully. Please select a client to populate the data.");
+
+      if (rows.length > 0) {
+        const matchedRow = rows[0];
+        const newMetrics = { ...metricsData };
+        let updated = false;
+
+        Object.keys(matchedRow).forEach((header) => {
+          const valStr = matchedRow[header];
+          if (!valStr) return;
+
+          const normalizedHeader = header.replace(/[^a-z0-9]/g, "").toLowerCase();
+          const cleanVal = parseFloat(valStr.replace(/[$,%]/g, ""));
+
+          if (!isNaN(cleanVal)) {
+            for (const tab of template.tabs) {
+              if (tab.fields) {
+                for (const field of tab.fields) {
+                  const normalizedLabel = field.label.replace(/[^a-z0-9]/g, "").toLowerCase();
+                  if (normalizedLabel.includes(normalizedHeader) || normalizedHeader.includes(field.key.toLowerCase())) {
+                    newMetrics[field.key] = cleanVal;
+                    updated = true;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          if (header === "report title" || header === "title") {
+            setTitle(valStr);
+            updated = true;
+          } else if (header === "start date" || header === "startdate") {
+            const d = new Date(valStr);
+            if (!isNaN(d.getTime())) {
+              setDateRangeStart(d.toISOString().split("T")[0]);
+              updated = true;
+            }
+          } else if (header === "end date" || header === "enddate") {
+            const d = new Date(valStr);
+            if (!isNaN(d.getTime())) {
+              setDateRangeEnd(d.toISOString().split("T")[0]);
+              updated = true;
+            }
+          }
+        });
+
+        if (updated) {
+          setMetricsData(newMetrics);
+          alert("CSV data applied successfully.");
+        } else {
+          alert("CSV uploaded but no matching metrics were recognized.");
+        }
       }
     };
     reader.readAsText(file);
-    e.target.value = '';
+    e.target.value = "";
   };
 
-  const selectedClient = clients.find((c) => c.id === formData.clientId);
+  const selectedClient = clients.find((c) => c.id === clientId);
+
+  const renderTemplateForm = () => {
+    const formProps = {
+      metricsData,
+      onChange: setMetricsData,
+      clientId,
+      templateType,
+      onGenerateAiSummary: handleGenerateAiSummary,
+      isGeneratingSummary,
+    };
+
+    switch (templateType) {
+      case "seo":
+        return <SeoForm {...formProps} />;
+      case "paidAds":
+        return <PaidAdsForm {...formProps} />;
+      case "socialMedia":
+        return <SocialMediaForm {...formProps} />;
+      default:
+        return <GeneralMarketingForm {...formProps} />;
+    }
+  };
+
+  if (loadingReport) {
+    return <EditReportPageLoading />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b">
         <div className="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <Link href="/reports">
+          <Link href={`/reports/${reportId}`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl font-semibold">Edit Report</h1>
+            <h1 className="text-xl font-semibold">
+              {template.icon} Edit {template.name}
+            </h1>
           </div>
           <Button variant="outline" asChild>
             <Link href={`/reports/${reportId}`}>Cancel</Link>
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !formData.clientId || !formData.title || loadingReport}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || !clientId || !title}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <Save className="mr-2 h-4 w-4" />
             Save Changes
@@ -440,12 +378,7 @@ function EditReportPageContent() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="client">Client *</Label>
-                    <Select value={formData.clientId} onValueChange={(v) => {
-                      updateField("clientId", v);
-                      if (importedCsvData) {
-                        applyCsvDataForClient(v, importedCsvData);
-                      }
-                    }} disabled={loadingClients}>
+                    <Select value={clientId} onValueChange={setClientId} disabled={loadingClients}>
                       <SelectTrigger id="client">
                         <SelectValue placeholder={loadingClients ? "Loading..." : "Select a client"} />
                       </SelectTrigger>
@@ -475,8 +408,8 @@ function EditReportPageContent() {
                     <Label htmlFor="title">Report Title *</Label>
                     <Input
                       id="title"
-                      value={formData.title}
-                      onChange={(e) => updateField("title", e.target.value)}
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
                       placeholder="Q1 2025 Performance Report"
                     />
                   </div>
@@ -488,8 +421,8 @@ function EditReportPageContent() {
                     <Input
                       id="startDate"
                       type="date"
-                      value={formData.dateRangeStart}
-                      onChange={(e) => updateField("dateRangeStart", e.target.value)}
+                      value={dateRangeStart}
+                      onChange={(e) => setDateRangeStart(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -497,25 +430,25 @@ function EditReportPageContent() {
                     <Input
                       id="endDate"
                       type="date"
-                      value={formData.dateRangeEnd}
-                      onChange={(e) => updateField("dateRangeEnd", e.target.value)}
+                      value={dateRangeEnd}
+                      onChange={(e) => setDateRangeEnd(e.target.value)}
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Metrics Input */}
+            {/* CSV Import */}
             <Card>
-              <CardHeader>
+              <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Metrics Data</CardTitle>
-                    <CardDescription>Enter the performance data for this reporting period.</CardDescription>
+                    <p className="text-sm font-medium">Import from CSV</p>
+                    <p className="text-xs text-muted-foreground">Upload a CSV file to auto-populate metrics.</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                     <Upload className="mr-2 h-4 w-4" />
-                    Import CSV
+                    Upload CSV
                   </Button>
                   <input
                     type="file"
@@ -525,205 +458,11 @@ function EditReportPageContent() {
                     onChange={handleFileUpload}
                   />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="flex flex-wrap sm:grid sm:grid-cols-4 mb-6 h-auto">
-                    <TabsTrigger value="traffic">Traffic</TabsTrigger>
-                    <TabsTrigger value="conversion">Conversions</TabsTrigger>
-                    <TabsTrigger value="paid">Paid Ads</TabsTrigger>
-                    <TabsTrigger value="audience">Audience</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="traffic" className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="organicTraffic">Organic Traffic</Label>
-                        <Input
-                          id="organicTraffic"
-                          type="number"
-                          placeholder="0"
-                          value={formData.organicTraffic ?? ""}
-                          onChange={(e) => updateField("organicTraffic", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="previousOrganic">Previous Period Organic</Label>
-                        <Input
-                          id="previousOrganic"
-                          type="number"
-                          placeholder="0"
-                          value={formData.previousOrganicTraffic ?? ""}
-                          onChange={(e) => updateField("previousOrganicTraffic", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="paidTraffic">Paid Traffic</Label>
-                        <Input
-                          id="paidTraffic"
-                          type="number"
-                          placeholder="0"
-                          value={formData.paidTraffic ?? ""}
-                          onChange={(e) => updateField("paidTraffic", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="conversion" className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="conversions">Total Conversions</Label>
-                        <Input
-                          id="conversions"
-                          type="number"
-                          placeholder="0"
-                          value={formData.conversions ?? ""}
-                          onChange={(e) => updateField("conversions", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="conversionRate">Conversion Rate (%)</Label>
-                        <Input
-                          id="conversionRate"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.0"
-                          value={formData.conversionRate ?? ""}
-                          onChange={(e) => updateField("conversionRate", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="previousConversions">Previous Period Conversions</Label>
-                        <Input
-                          id="previousConversions"
-                          type="number"
-                          placeholder="0"
-                          value={formData.previousConversions ?? ""}
-                          onChange={(e) => updateField("previousConversions", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="paid" className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="spend">Ad Spend ($)</Label>
-                        <Input
-                          id="spend"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={formData.spend ?? ""}
-                          onChange={(e) => updateField("spend", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="roas">ROAS</Label>
-                        <Input
-                          id="roas"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.0"
-                          value={formData.roas ?? ""}
-                          onChange={(e) => updateField("roas", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="impressions">Impressions</Label>
-                        <Input
-                          id="impressions"
-                          type="number"
-                          placeholder="0"
-                          value={formData.impressions ?? ""}
-                          onChange={(e) => updateField("impressions", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="clicks">Clicks</Label>
-                        <Input
-                          id="clicks"
-                          type="number"
-                          placeholder="0"
-                          value={formData.clicks ?? ""}
-                          onChange={(e) => updateField("clicks", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ctr">CTR (%)</Label>
-                        <Input
-                          id="ctr"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.0"
-                          value={formData.ctr ?? ""}
-                          onChange={(e) => updateField("ctr", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="audience" className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="socialFollowers">Social Followers</Label>
-                        <Input
-                          id="socialFollowers"
-                          type="number"
-                          placeholder="0"
-                          value={formData.socialFollowers ?? ""}
-                          onChange={(e) => updateField("socialFollowers", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="socialEngagement">Social Engagement (%)</Label>
-                        <Input
-                          id="socialEngagement"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.0"
-                          value={formData.socialEngagement ?? ""}
-                          onChange={(e) => updateField("socialEngagement", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="emailSubscribers">Email Subscribers</Label>
-                        <Input
-                          id="emailSubscribers"
-                          type="number"
-                          placeholder="0"
-                          value={formData.emailSubscribers ?? ""}
-                          onChange={(e) => updateField("emailSubscribers", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="emailOpenRate">Email Open Rate (%)</Label>
-                        <Input
-                          id="emailOpenRate"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.0"
-                          value={formData.emailOpenRate ?? ""}
-                          onChange={(e) => updateField("emailOpenRate", e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <div className="mt-6 pt-6 border-t">
-                  <Label htmlFor="notes" className="mb-2 block">Executive Summary & Notes</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="This month we saw a 15% increase in organic traffic due to..."
-                    className="min-h-[120px]"
-                    value={formData.notes}
-                    onChange={(e) => updateField("notes", e.target.value)}
-                  />
-                </div>
               </CardContent>
             </Card>
+
+            {/* Template-Specific Metrics Form */}
+            {renderTemplateForm()}
 
             {/* Publish Toggle */}
             <Card>
@@ -737,8 +476,8 @@ function EditReportPageContent() {
                   </div>
                   <Switch
                     id="isPublic"
-                    checked={formData.isPublic}
-                    onCheckedChange={(checked) => updateField("isPublic", checked)}
+                    checked={isPublic}
+                    onCheckedChange={setIsPublic}
                   />
                 </div>
               </CardContent>
@@ -754,13 +493,12 @@ function EditReportPageContent() {
                   <Eye className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  {!selectedClient || !formData.title ? (
+                  {!selectedClient || !title ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                       <p className="text-muted-foreground">Select a client and enter a title to see preview</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* Preview Header */}
                       <div className="flex items-center gap-2 text-sm">
                         <div
                           className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
@@ -772,57 +510,50 @@ function EditReportPageContent() {
                           {selectedClient.name}
                         </span>
                       </div>
-                      
-                      <h3 className="text-2xl font-bold">{formData.title}</h3>
-                      
+
+                      <h3 className="text-2xl font-bold">{title}</h3>
+
                       <p className="text-sm text-muted-foreground">
-                        {formData.dateRangeStart && formData.dateRangeEnd
-                          ? `${new Date(formData.dateRangeStart).toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${new Date(formData.dateRangeEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
+                        {dateRangeStart && dateRangeEnd
+                          ? `${new Date(dateRangeStart).toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${new Date(dateRangeEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
                           : "Select date range"}
                       </p>
 
-                      {/* KPI Cards Preview */}
+                      <Badge variant="secondary">{template.name}</Badge>
+
                       <div className="grid grid-cols-2 gap-3 pt-4">
-                        {formData.organicTraffic != null && (
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Total Traffic</p>
-                            <p className="text-xl font-bold">
-                              {((formData.organicTraffic || 0) + (formData.paidTraffic || 0)).toLocaleString()}
-                            </p>
-                          </div>
-                        )}
-                        {formData.conversions != null && (
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Conversions</p>
-                            <p className="text-xl font-bold">{formData.conversions.toLocaleString()}</p>
-                          </div>
-                        )}
-                        {formData.spend != null && (
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Ad Spend</p>
-                            <p className="text-xl font-bold">${formData.spend.toLocaleString()}</p>
-                          </div>
-                        )}
-                        {formData.roas != null && (
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">ROAS</p>
-                            <p className="text-xl font-bold">{formData.roas}x</p>
-                          </div>
-                        )}
+                        {(template.tabs[0]?.fields || [])
+                          .filter((f) => f.type === "number" || f.type === "currency" || f.type === "percentage")
+                          .slice(0, 4)
+                          .map((field) => {
+                            const val = metricsData[field.key];
+                            if (val == null || val === "") return null;
+                            const displayVal = field.type === "currency"
+                              ? `$${Number(val).toLocaleString()}`
+                              : field.type === "percentage"
+                              ? `${val}%`
+                              : Number(val).toLocaleString();
+                            return (
+                              <div key={field.key} className="p-3 rounded-lg bg-muted/50">
+                                <p className="text-xs text-muted-foreground">{field.label}</p>
+                                <p className="text-xl font-bold">{displayVal}</p>
+                              </div>
+                            );
+                          })}
                       </div>
 
-                      {/* Notes Preview */}
-                      {formData.notes && (
+                      {metricsData.executiveSummary && (
                         <div className="pt-4 border-t">
                           <p className="text-sm font-medium mb-2">Summary</p>
-                          <p className="text-sm text-muted-foreground line-clamp-3">{formData.notes}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-3">
+                            {metricsData.executiveSummary as string}
+                          </p>
                         </div>
                       )}
 
-                      {/* Status */}
                       <div className="pt-4 border-t">
-                        <Badge variant={formData.isPublic ? "default" : "secondary"}>
-                          {formData.isPublic ? "Published" : "Draft"}
+                        <Badge variant={isPublic ? "default" : "secondary"}>
+                          {isPublic ? "Published" : "Draft"}
                         </Badge>
                       </div>
                     </div>

@@ -69,7 +69,7 @@ export async function PUT(
     const { id } = params;
     const body = await req.json();
 
-    const { title, dateRangeStart, dateRangeEnd, metricsData, isPublic, status, shareToken } = body;
+    const { title, templateType, dateRangeStart, dateRangeEnd, metricsData, isPublic, status, shareToken } = body;
 
     const [existingReport] = await db
       .select()
@@ -88,6 +88,7 @@ export async function PUT(
       .update(reports)
       .set({
         title,
+        templateType: templateType || undefined,
         dateRangeStart: dateRangeStart ? new Date(dateRangeStart) : undefined,
         dateRangeEnd: dateRangeEnd ? new Date(dateRangeEnd) : undefined,
         metricsData: metricsData || undefined,

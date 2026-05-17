@@ -86,6 +86,7 @@ export async function POST(
         clientId: original.clientId,
         userId: original.userId,
         title: newTitle,
+        templateType: original.templateType,
         dateRangeStart: addMonths(new Date(original.dateRangeStart), 1),
         dateRangeEnd: addMonths(new Date(original.dateRangeEnd), 1),
         metricsData: clearedMetrics,

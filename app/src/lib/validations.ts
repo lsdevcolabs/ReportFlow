@@ -11,47 +11,26 @@ export const CreateClientSchema = z.object({
 
 export const UpdateClientSchema = CreateClientSchema.partial();
 
-export const MetricsDataSchema = z.object({
-  summary: z.object({
-    sessions: z.number().min(0),
-    conversions: z.number().min(0),
-    revenue: z.number().min(0).optional(),
-    previousSessions: z.number().min(0).optional(),
-    previousConversions: z.number().min(0).optional(),
-  }).optional(),
-  channelBreakdown: z.array(z.object({
-    channel: z.string(),
-    sessions: z.number().min(0),
-    percentage: z.number().min(0).max(100).optional(),
-  })).optional(),
-  weeklyTrend: z.array(z.object({
-    week: z.string(),
-    sessions: z.number().min(0),
-    conversions: z.number().min(0),
-  })).optional(),
-  customMetrics: z.array(z.object({
-    label: z.string(),
-    value: z.string(),
-    change: z.string().optional(),
-    changeType: z.enum(["positive", "negative", "neutral"]).optional(),
-  })).optional(),
-  notes: z.string().optional(),
-});
+// Flexible schema — accepts any JSON structure for metricsData
+// Template-specific data is validated client-side, stored as JSONB
+export const MetricsDataSchema = z.record(z.unknown()).optional();
 
 export const CreateReportSchema = z.object({
   clientId: z.string().min(1, "clientId is required"),
   title: z.string().min(1, "title is required").max(300),
+  templateType: z.enum(["general", "seo", "paidAds", "socialMedia"]).optional(),
   dateRangeStart: z.string().datetime().or(z.string().min(1)),
   dateRangeEnd: z.string().datetime().or(z.string().min(1)),
-  metricsData: MetricsDataSchema.optional(),
+  metricsData: MetricsDataSchema,
   isPublic: z.boolean().optional(),
 });
 
 export const UpdateReportSchema = z.object({
   title: z.string().min(1).max(300).optional(),
+  templateType: z.enum(["general", "seo", "paidAds", "socialMedia"]).optional(),
   dateRangeStart: z.string().optional(),
   dateRangeEnd: z.string().optional(),
-  metricsData: MetricsDataSchema.optional(),
+  metricsData: MetricsDataSchema,
   isPublic: z.boolean().optional(),
   shareToken: z.string().optional(),
   status: z.enum(["draft", "published"]).optional(),

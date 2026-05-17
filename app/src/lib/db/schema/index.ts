@@ -54,6 +54,7 @@ export const reports = pgTable("reports", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(), // e.g., "April 2025 Marketing Report"
+  templateType: text("template_type").default("general"), // 'general' | 'seo' | 'paidAds' | 'socialMedia'
   dateRangeStart: timestamp("date_range_start").notNull(),
   dateRangeEnd: timestamp("date_range_end").notNull(),
 

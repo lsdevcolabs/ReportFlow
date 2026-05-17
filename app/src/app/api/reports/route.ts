@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { clientId, title, dateRangeStart, dateRangeEnd, metricsData, isPublic } = parsed.data;
+    const { clientId, title, templateType, dateRangeStart, dateRangeEnd, metricsData, isPublic } = parsed.data;
 
     const [client] = await db
       .select()
@@ -127,6 +127,7 @@ export async function POST(req: NextRequest) {
         clientId,
         userId,
         title,
+        templateType: templateType || "general",
         dateRangeStart: new Date(dateRangeStart),
         dateRangeEnd: new Date(dateRangeEnd),
         metricsData: metricsData || {},

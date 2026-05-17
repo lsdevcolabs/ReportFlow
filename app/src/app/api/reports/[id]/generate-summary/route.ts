@@ -1,169 +1,131 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/clerk-auth";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { reports, clients } from "@/lib/db/schema";
+import { reports, clients, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { isAiSummaryAllowed } from "@/lib/plan-limits";
-import type { Plan } from "@/lib/plan-limits";
-import { getUserById } from "@/lib/auth";
-import Anthropic from "@anthropic-ai/sdk";
+import { generateWithGemini } from "@/lib/gemini";
+import { canPerformAction } from "@/lib/plans";
 import { trackAiSummaryGenerated } from "@/lib/analytics";
 
-export const dynamic = "force-dynamic";
-
-const anthropic = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  : null;
+export const runtime = "nodejs";
 
 export async function POST(
-  req: NextRequest,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
+  const { userId } = auth();
+  if (!userId) {
+    return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId));
+
+  if (!user) {
+    return Response.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+  }
+
+  if (!canPerformAction(user.plan, "aiSummary")) {
+    return Response.json(
+      {
+        error: "PLAN_LIMIT_REACHED",
+        message: "AI summary generation is available on Starter and Pro plans.",
+        upgradeUrl: "/upgrade",
+      },
+      { status: 403 }
+    );
+  }
+
+  const [result] = await db
+    .select({ report: reports, client: clients })
+    .from(reports)
+    .leftJoin(clients, eq(reports.clientId, clients.id))
+    .where(
+      and(
+        eq(reports.id, params.id),
+        eq(reports.userId, userId)
+      )
+    );
+
+  if (!result) {
+    return Response.json({ error: "REPORT_NOT_FOUND" }, { status: 404 });
+  }
+
+  const { report, client } = result;
+  const m = report.metricsData as any;
+
+  const dateStart = report.dateRangeStart
+    ? new Date(report.dateRangeStart).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "N/A";
+  const dateEnd = report.dateRangeEnd
+    ? new Date(report.dateRangeEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "N/A";
+
+  const customMetricsList = (m?.customMetrics ?? [])
+    .filter((km: any) => km.label && km.value)
+    .map((km: any) => `- ${km.label}: ${km.value}${km.change ? ` (${km.change})` : ""}`)
+    .join("\n");
+
+  const prompt = `
+You are a professional digital marketing analyst writing an executive summary for a client performance report.
+
+RULES:
+- Write exactly 3 to 5 sentences. No more, no less.
+- Use the exact numbers provided. Do not invent or round numbers unless they are already rounded.
+- Tone: professional, positive, and client-friendly. Clients read this — make them feel their investment is working.
+- If a metric shows a decline (negative % change), acknowledge it briefly and frame it constructively, e.g. "We are actively optimizing X to address the decline."
+- Do NOT use bullet points, headers, bold text, or any markdown formatting.
+- Output ONLY the paragraph. No preamble like "Here is your summary:" or "Sure!".
+- End the last sentence with a forward-looking statement about the next steps or what to focus on next period.
+
+REPORT DATA:
+Report Title: ${report.title ?? "Performance Report"}
+Client: ${client?.name ?? "Client"}
+Reporting Period: ${dateStart} to ${dateEnd}
+
+TRAFFIC:
+- Organic Traffic: ${m?.summary?.organicTraffic ?? "N/A"}${m?.summary?.previousOrganic ? ` (previous period: ${m.summary.previousOrganic})` : ""}
+- Paid Traffic: ${m?.summary?.paidTraffic ?? "N/A"}
+- Total Sessions: ${(m?.summary?.organicTraffic ?? 0) + (m?.summary?.paidTraffic ?? 0)}
+
+CONVERSIONS:
+- Conversions: ${m?.summary?.conversions ?? "N/A"}${m?.summary?.previousConversions ? ` (previous period: ${m.summary.previousConversions})` : ""}
+- Revenue: ${m?.summary?.revenue ? `$${m.summary.revenue}` : "N/A"}
+- Bounce Rate: ${m?.summary?.bounceRate ? `${m.summary.bounceRate}%` : "N/A"}
+
+PAID ADS:
+- Ad Spend: ${m?.summary?.adSpend ? `$${m.summary.adSpend}` : "N/A"}
+- ROAS: ${m?.summary?.roas ? `${m.summary.roas}x` : "N/A"}
+- CTR: ${m?.summary?.ctr ? `${m.summary.ctr}%` : "N/A"}
+
+${customMetricsList ? `CUSTOM METRICS:\n${customMetricsList}` : ""}
+
+Write the executive summary paragraph now:
+`.trim();
+
   try {
-    const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const summary = await generateWithGemini(prompt);
 
-    const user = await getUserById(userId);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    trackAiSummaryGenerated(userId, params.id);
 
-    const plan = (user.plan || "free") as Plan;
+    return Response.json(
+      { summary },
+      { status: 200 }
+    );
 
-    // Check if AI summary is allowed
-    if (!isAiSummaryAllowed(plan)) {
-      return NextResponse.json(
-        {
-          error: "UPGRADE_REQUIRED",
-          message: "AI-generated summaries require a Starter or Pro plan.",
-          upgradeUrl: "/upgrade",
-        },
-        { status: 403 }
-      );
-    }
+  } catch (error: any) {
+    console.error("[generate-summary] Error:", error.message);
 
-    if (!anthropic) {
-      return NextResponse.json(
-        { error: "AI_NOT_CONFIGURED", message: "AI service is not configured." },
-        { status: 503 }
-      );
-    }
-
-    const { id } = params;
-    const body = await req.json().catch(() => ({}));
-    const { clientName: bodyClientName } = body as { clientName?: string };
-
-    // Fetch report
-    const [report] = await db
-      .select()
-      .from(reports)
-      .where(and(eq(reports.id, id), eq(reports.userId, userId)))
-      .limit(1);
-
-    if (!report) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
-    }
-
-    // Fetch client
-    const [client] = await db
-      .select()
-      .from(clients)
-      .where(eq(clients.id, report.clientId))
-      .limit(1);
-
-    const clientName = bodyClientName || client?.name || "the client";
-    const metricsData = report.metricsData as any;
-
-    // Build the prompt
-    const dateRange = `${new Date(report.dateRangeStart).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} - ${new Date(report.dateRangeEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`;
-
-    let metricsContext = "";
-    if (metricsData?.summary) {
-      const s = metricsData.summary;
-      metricsContext += `\n- Total sessions: ${s.sessions ?? "N/A"}`;
-      metricsContext += `\n- Conversions: ${s.conversions ?? "N/A"}`;
-      if (s.revenue) metricsContext += `\n- Revenue: $${s.revenue.toLocaleString()}`;
-      if (s.previousSessions) {
-        const change = s.sessions
-          ? Math.round(((s.sessions - s.previousSessions) / s.previousSessions) * 100)
-          : null;
-        metricsContext += `\n- Previous period sessions: ${s.previousSessions}`;
-        if (change !== null) metricsContext += `\n- Session change: ${change >= 0 ? "+" : ""}${change}%`;
-      }
-    }
-    if (metricsData?.channelBreakdown?.length) {
-      metricsContext += "\n\nChannel breakdown:";
-      for (const ch of metricsData.channelBreakdown) {
-        metricsContext += `\n- ${ch.channel}: ${ch.sessions} sessions`;
-      }
-    }
-    if (metricsData?.customMetrics?.length) {
-      metricsContext += "\n\nAdditional metrics:";
-      for (const m of metricsData.customMetrics) {
-        metricsContext += `\n- ${m.label}: ${m.value}`;
-        if (m.change) metricsContext += ` (${m.change})`;
-      }
-    }
-
-    const prompt = `You are a marketing analyst writing an executive summary for a client report.
-
-Client: ${clientName}
-Report period: ${dateRange}
-Report title: ${report.title}
-
-Performance data:${metricsContext}
-
-Write a concise, professional executive summary (3-5 sentences) that:
-1. Highlights the key performance outcomes
-2. Notes significant trends or changes compared to the previous period
-3. Uses a positive, professional tone appropriate for client communication
-4. Avoids jargon — keep it accessible
-
-Do not include a greeting or sign-off. Just write the summary paragraph directly.`;
-
-    // Stream the response
-    const stream = await anthropic.messages.stream({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 500,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    // Create a ReadableStream for the response
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const event of stream) {
-            if (
-              event.type === "content_block_delta" &&
-              event.delta.type === "text_delta"
-            ) {
-              controller.enqueue(new TextEncoder().encode(event.delta.text));
-            }
-          }
-          controller.close();
-
-          // Track analytics after streaming completes
-          trackAiSummaryGenerated(userId, id);
-        } catch (error) {
-          console.error("[AI Summary Stream Error]", error);
-          controller.error(error);
-        }
+    return Response.json(
+      {
+        error: "AI_UNAVAILABLE",
+        message:
+          error.message.includes("All API keys")
+            ? "AI generation is temporarily unavailable due to rate limits. Please try again in a few minutes."
+            : "Something went wrong generating the summary. Please try again.",
       },
-    });
-
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Transfer-Encoding": "chunked",
-      },
-    });
-  } catch (error) {
-    console.error("[POST /api/reports/[id]/generate-summary]", error);
-    return NextResponse.json(
-      { error: "INTERNAL_SERVER_ERROR" },
-      { status: 500 }
+      { status: 503 }
     );
   }
 }

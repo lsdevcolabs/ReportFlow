@@ -881,27 +881,27 @@ Write the executive summary now.
 #### API Route
 **File:** `app/api/reports/[id]/generate-summary/route.ts`
 
+Uses Google Gemini with 3-key rotation + fallback. See `lib/gemini.ts` for the key rotation logic.
+
 ```typescript
 import { auth } from '@clerk/nextjs/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { db } from '@/lib/db';
 import { reports, clients, users } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { generateWithGemini } from '@/lib/gemini';
 import { canPerformAction } from '@/lib/plans';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+export const runtime = 'nodejs';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const { userId } = auth();
   if (!userId) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
 
-  // Check plan gating
   const [user] = await db.select().from(users).where(eq(users.id, userId));
   if (!canPerformAction(user.plan, 'aiSummary')) {
     return Response.json({ error: 'PLAN_LIMIT_REACHED', upgradeUrl: '/upgrade' }, { status: 403 });
   }
 
-  // Fetch report
   const [result] = await db
     .select({ report: reports, client: clients })
     .from(reports)
@@ -913,102 +913,50 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { report, client } = result;
   const m = report.metricsData;
 
-  // Build the prompt
-  const userMessage = `
-Report Title: ${report.title}
-Date Range: ${report.dateRangeStart.toDateString()} to ${report.dateRangeEnd.toDateString()}
-Client: ${client?.name ?? 'Client'}
+  const prompt = buildPrompt(report, client, m);
 
-TRAFFIC:
-- Organic Traffic: ${m.summary?.organicTraffic ?? 'N/A'} (previous: ${m.summary?.previousOrganic ?? 'N/A'})
-- Paid Traffic: ${m.summary?.paidTraffic ?? 'N/A'}
-- Total Sessions: ${(m.summary?.organicTraffic ?? 0) + (m.summary?.paidTraffic ?? 0)}
-
-CONVERSIONS:
-- Conversions: ${m.summary?.conversions ?? 'N/A'} (previous: ${m.summary?.previousConversions ?? 'N/A'})
-- Revenue: ${m.summary?.revenue ?? 'N/A'}
-- Bounce Rate: ${m.summary?.bounceRate ?? 'N/A'}%
-
-PAID ADS:
-- Ad Spend: $${m.summary?.adSpend ?? 'N/A'}
-- ROAS: ${m.summary?.roas ?? 'N/A'}x
-- CTR: ${m.summary?.ctr ?? 'N/A'}%
-
-CUSTOM METRICS:
-${(m.customMetrics ?? []).map((km: any) => `- ${km.label}: ${km.value} (${km.change})`).join('\n')}
-
-Write the executive summary now.
-  `.trim();
-
-  // Stream the response back to the client
-  const stream = anthropic.messages.stream({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 300,
-    system: `You are a professional digital marketing analyst writing an executive summary for a client performance report. Write exactly 3-5 sentences. Use the specific numbers from the data. Tone: professional, positive, client-friendly. Focus on wins and growth. If a metric shows decline, acknowledge it briefly and frame it constructively. No bullet points, headers, or markdown. Output ONLY the paragraph — no preamble. End with a forward-looking sentence about next steps.`,
-    messages: [{ role: 'user', content: userMessage }],
-  });
-
-  // Return as a ReadableStream so the frontend can stream the text
-  const readable = new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-          controller.enqueue(new TextEncoder().encode(chunk.delta.text));
-        }
-      }
-      controller.close();
-    },
-  });
-
-  return new Response(readable, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-  });
+  try {
+    const summary = await generateWithGemini(prompt);
+    return Response.json({ summary }, { status: 200 });
+  } catch {
+    return Response.json({ error: 'AI_UNAVAILABLE', message: 'Try again later.' }, { status: 503 });
+  }
 }
 ```
 
-#### Frontend — Streaming into Textarea
-In the report builder component, handle the streaming response:
+#### Frontend — JSON Response (no streaming)
 ```typescript
 async function handleGenerateSummary() {
   setIsGenerating(true);
-  setNotes(''); // Clear existing text
+  setNotes('');
 
   const response = await fetch(`/api/reports/${reportId}/generate-summary`, { method: 'POST' });
+  const data = await response.json();
 
-  if (response.status === 403) {
-    setShowUpgradePrompt(true);
-    setIsGenerating(false);
-    return;
-  }
-
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value);
-    setNotes(prev => prev + chunk); // Appends character by character
-  }
+  if (response.status === 403) { setShowUpgradePrompt(true); setIsGenerating(false); return; }
+  if (response.status === 503 || !response.ok) { toast.error(data.message); setIsGenerating(false); return; }
+  if (data.summary) setNotes(data.summary);
 
   setIsGenerating(false);
 }
 ```
 
 #### Plan Gating
-Add `aiSummary: boolean` to `PLAN_LIMITS` in `lib/plans.ts`:
+`lib/plans.ts` already has `aiSummary` in its `PLAN_LIMITS`:
 ```typescript
 free: { aiSummary: false, ... }
 starter: { aiSummary: true, ... }
 pro: { aiSummary: true, ... }
 ```
 
-#### Environment Variable Needed
+#### Environment Variables Needed
 Add to `.env.local`:
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY_1=your_key_1
+GEMINI_API_KEY_2=your_key_2
+GEMINI_API_KEY_3=your_key_3
 ```
-Install SDK: `npm install @anthropic-ai/sdk`
+Install SDK: `npm install @google/generative-ai`
 
 ---
 
