@@ -89,6 +89,7 @@ export async function GET(
         report: {
           id: report.id,
           title: report.title,
+          templateType: report.templateType,
           status: report.status || "draft",
           dateRangeStart: report.dateRangeStart.toISOString(),
           dateRangeEnd: report.dateRangeEnd.toISOString(),

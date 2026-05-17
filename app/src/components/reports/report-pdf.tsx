@@ -6,14 +6,12 @@ import {
   View,
   StyleSheet,
   Image,
-  Font,
 } from "@react-pdf/renderer";
-
-
 
 const styles = StyleSheet.create({
   page: {
     padding: 40,
+    paddingBottom: 80,
     fontSize: 10,
     color: "#1e293b",
     backgroundColor: "#ffffff",
@@ -27,8 +25,19 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    justifyContent: "space-between",
     marginBottom: 16,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  agencyLogo: {
+    width: 60,
+    height: 40,
+    objectFit: "contain",
   },
   logo: {
     width: 48,
@@ -98,13 +107,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   kpiCard: {
-    flex: 1,
-    minWidth: 120,
+    width: "30%",
     padding: 16,
     backgroundColor: "#f8fafc",
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    marginBottom: 8,
   },
   kpiLabel: {
     fontSize: 9,
@@ -114,7 +123,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   kpiValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 700,
     color: "#0f172a",
     marginBottom: 4,
@@ -126,27 +135,6 @@ const styles = StyleSheet.create({
   kpiChangeNegative: {
     fontSize: 9,
     color: "#ef4444",
-  },
-  metricsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-  },
-  metricItem: {
-    width: "23%",
-    padding: 12,
-    backgroundColor: "#f8fafc",
-    borderRadius: 6,
-  },
-  metricLabel: {
-    fontSize: 9,
-    color: "#64748b",
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: "#0f172a",
   },
   channelTable: {
     borderWidth: 1,
@@ -165,6 +153,7 @@ const styles = StyleSheet.create({
     color: "#64748b",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    flex: 1,
   },
   tableRow: {
     flexDirection: "row",
@@ -175,11 +164,13 @@ const styles = StyleSheet.create({
   tableCell: {
     fontSize: 10,
     color: "#334155",
+    flex: 1,
   },
-  tableCellValue: {
+  tableCellBold: {
     fontSize: 10,
     fontWeight: 600,
     color: "#0f172a",
+    flex: 1,
   },
   notesBox: {
     padding: 16,
@@ -187,6 +178,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: "#2563eb",
+    marginBottom: 12,
+  },
+  notesLabel: {
+    fontSize: 10,
+    fontWeight: 600,
+    color: "#0f172a",
+    marginBottom: 4,
   },
   notesText: {
     fontSize: 10,
@@ -205,34 +203,33 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",
   },
+  footerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  footerLogo: {
+    width: 16,
+    height: 16,
+    objectFit: "contain",
+  },
   footerText: {
     fontSize: 8,
     color: "#94a3b8",
   },
-  poweredBy: {
-    fontSize: 8,
-    color: "#94a3b8",
+  subSectionTitle: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#334155",
+    marginBottom: 10,
   },
 });
-
-interface MetricsData {
-  summary?: {
-    sessions: number;
-    conversions: number;
-    revenue?: number;
-    previousSessions?: number;
-    previousConversions?: number;
-  };
-  channelBreakdown?: Array<{ channel: string; sessions: number; percentage?: number }>;
-  weeklyTrend?: Array<{ week: string; sessions: number; conversions: number }>;
-  customMetrics?: Array<{ label: string; value: string; change?: string; changeType?: string }>;
-  notes?: string;
-}
 
 interface ReportPDFProps {
   report: {
     id: string;
     title: string;
+    templateType?: string | null;
     status?: string | null;
     dateRangeStart: string;
     dateRangeEnd: string;
@@ -256,6 +253,10 @@ function formatNumber(num: number): string {
   return num.toLocaleString();
 }
 
+function formatCurrency(num: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
+}
+
 function formatDateRange(start: string, end: string): string {
   const startDate = new Date(start);
   const endDate = new Date(end);
@@ -268,27 +269,239 @@ function calculateChange(current: number, previous: number): number {
   return ((current - previous) / previous) * 100;
 }
 
+// Render a KPI card
+function KpiCard({ label, value, prevValue, currentValue }: { label: string; value: string; prevValue?: number; currentValue?: number }) {
+  const hasChange = prevValue != null && currentValue != null && prevValue > 0;
+  const change = hasChange ? calculateChange(currentValue!, prevValue!) : 0;
+
+  return (
+    <View style={styles.kpiCard}>
+      <Text style={styles.kpiLabel}>{label}</Text>
+      <Text style={styles.kpiValue}>{value}</Text>
+      {hasChange && (
+        <Text style={change >= 0 ? styles.kpiChange : styles.kpiChangeNegative}>
+          {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs previous
+        </Text>
+      )}
+    </View>
+  );
+}
+
+// Render a table of data
+function DataTable({ columns, rows }: { columns: { key: string; label: string }[]; rows: Record<string, unknown>[] }) {
+  if (!rows || rows.length === 0) return null;
+
+  return (
+    <View style={styles.channelTable}>
+      <View style={styles.tableHeader}>
+        {columns.map((col) => (
+          <Text key={col.key} style={styles.tableHeaderCell}>{col.label}</Text>
+        ))}
+      </View>
+      {rows.map((row, idx) => (
+        <View key={idx} style={styles.tableRow}>
+          {columns.map((col, colIdx) => (
+            <Text key={col.key} style={colIdx === 0 ? styles.tableCellBold : styles.tableCell}>
+              {row[col.key] != null ? String(row[col.key]) : "-"}
+            </Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// Render a set of metric fields from data
+function MetricCards({ fields, data }: { fields: { key: string; label: string; type: string }[]; data: Record<string, unknown> }) {
+  const numericFields = fields.filter((f) => f.type === "number" || f.type === "currency" || f.type === "percentage");
+  const validFields = numericFields.filter((f) => data[f.key] != null && data[f.key] !== "");
+  if (validFields.length === 0) return null;
+
+  return (
+    <View style={styles.kpiGrid}>
+      {validFields.map((field) => {
+        const val = data[field.key];
+        let displayVal: string;
+        if (field.type === "currency") {
+          displayVal = formatCurrency(Number(val));
+        } else if (field.type === "percentage") {
+          displayVal = `${val}%`;
+        } else {
+          displayVal = formatNumber(Number(val));
+        }
+
+        const prevVal = data[`prev_${field.key}`];
+        const prevNum = prevVal != null ? Number(prevVal) : undefined;
+        const currNum = Number(val);
+
+        return <KpiCard key={field.key} label={field.label} value={displayVal} prevValue={prevNum} currentValue={currNum} />;
+      })}
+    </View>
+  );
+}
+
+// Notes section
+function NotesSection({ data, noteKeys }: { data: Record<string, unknown>; noteKeys: string[] }) {
+  const entries = noteKeys.filter((key) => data[key]);
+  if (entries.length === 0) return null;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Notes & Summary</Text>
+      {entries.map((key) => (
+        <View key={key} style={styles.notesBox}>
+          <Text style={styles.notesLabel}>
+            {key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim()}
+          </Text>
+          <Text style={styles.notesText}>{String(data[key])}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function ReportPDFDocument({ report, client, agency, whiteLabel }: ReportPDFProps) {
   const brandColor = client.brandColor || "#2563eb";
-  const metricsData = (report.metricsData || {}) as MetricsData;
+  const md = (report.metricsData || {}) as Record<string, any>;
   const clientName = client.name || "Client";
+  const templateType = report.templateType || "general";
+
+  // Define template-specific fields
+  const getFields = () => {
+    switch (templateType) {
+      case "seo":
+        return {
+          hero: [
+            { key: "organicSessions", label: "Organic Sessions", type: "number" },
+            { key: "googleImpressions", label: "Google Impressions", type: "number" },
+            { key: "googleClicks", label: "Google Clicks", type: "number" },
+            { key: "avgPosition", label: "Avg Position", type: "number" },
+            { key: "ctr", label: "CTR", type: "percentage" },
+            { key: "organicConversions", label: "Organic Conversions", type: "number" },
+          ],
+          extraMetrics: [
+            { key: "totalBacklinks", label: "Total Backlinks", type: "number" },
+            { key: "newBacklinks", label: "New Backlinks", type: "number" },
+            { key: "referringDomains", label: "Referring Domains", type: "number" },
+            { key: "domainAuthority", label: "Domain Authority", type: "number" },
+          ],
+          tableKey: "keywordRows",
+          tableColumns: [
+            { key: "keyword", label: "Keyword" },
+            { key: "currentPosition", label: "Position" },
+            { key: "previousPosition", label: "Prev Position" },
+            { key: "searchVolume", label: "Volume" },
+            { key: "status", label: "Status" },
+          ],
+          tableTitle: "Keyword Rankings",
+          noteKeys: ["executiveSummary", "keyWins", "issues", "actionPlan"],
+        };
+      case "paidAds":
+        return {
+          hero: [
+            { key: "totalAdSpend", label: "Total Ad Spend", type: "currency" },
+            { key: "totalConversions", label: "Total Conversions", type: "number" },
+            { key: "overallRoas", label: "Overall ROAS", type: "number" },
+            { key: "overallCpa", label: "Overall CPA", type: "currency" },
+            { key: "totalRevenue", label: "Total Revenue", type: "currency" },
+            { key: "totalImpressions", label: "Total Impressions", type: "number" },
+          ],
+          extraMetrics: [
+            { key: "googleSpend", label: "Google Spend", type: "currency" },
+            { key: "googleConversions", label: "Google Conversions", type: "number" },
+            { key: "googleRoas", label: "Google ROAS", type: "number" },
+            { key: "metaSpend", label: "Meta Spend", type: "currency" },
+            { key: "metaConversions", label: "Meta Conversions", type: "number" },
+            { key: "metaRoas", label: "Meta ROAS", type: "number" },
+          ],
+          tableKey: "campaignRows",
+          tableColumns: [
+            { key: "campaignName", label: "Campaign" },
+            { key: "platform", label: "Platform" },
+            { key: "spend", label: "Spend" },
+            { key: "impressions", label: "Impressions" },
+            { key: "clicks", label: "Clicks" },
+            { key: "conversions", label: "Conversions" },
+            { key: "roas", label: "ROAS" },
+            { key: "status", label: "Status" },
+          ],
+          tableTitle: "Campaign Performance",
+          noteKeys: ["executiveSummary", "topCampaign", "budgetRecommendation", "creativeNotes"],
+        };
+      case "socialMedia":
+        return {
+          hero: [
+            { key: "totalFollowers", label: "Total Followers", type: "number" },
+            { key: "totalReach", label: "Total Reach", type: "number" },
+            { key: "totalImpressions", label: "Total Impressions", type: "number" },
+            { key: "totalEngagements", label: "Total Engagements", type: "number" },
+            { key: "engagementRate", label: "Engagement Rate", type: "percentage" },
+            { key: "postsPublished", label: "Posts Published", type: "number" },
+          ],
+          extraMetrics: [],
+          tableKey: "contentRows",
+          tableColumns: [
+            { key: "postDescription", label: "Post" },
+            { key: "platform", label: "Platform" },
+            { key: "contentType", label: "Type" },
+            { key: "reach", label: "Reach" },
+            { key: "engagements", label: "Engagements" },
+          ],
+          tableTitle: "Content Performance",
+          noteKeys: ["executiveSummary", "topContentHighlight", "growthObservations", "contentStrategy"],
+        };
+      default:
+        return {
+          hero: [
+            { key: "totalSessions", label: "Total Sessions", type: "number" },
+            { key: "totalConversions", label: "Total Conversions", type: "number" },
+            { key: "totalRevenue", label: "Total Revenue", type: "currency" },
+            { key: "bounceRate", label: "Bounce Rate", type: "percentage" },
+          ],
+          extraMetrics: [
+            { key: "organicTraffic", label: "Organic Traffic", type: "number" },
+            { key: "paidTraffic", label: "Paid Traffic", type: "number" },
+            { key: "directTraffic", label: "Direct Traffic", type: "number" },
+            { key: "referralTraffic", label: "Referral Traffic", type: "number" },
+            { key: "leads", label: "Leads", type: "number" },
+            { key: "conversionRate", label: "Conversion Rate", type: "percentage" },
+          ],
+          tableKey: "channels",
+          tableColumns: [
+            { key: "name", label: "Channel" },
+            { key: "sessions", label: "Sessions" },
+          ],
+          tableTitle: "Channel Breakdown",
+          noteKeys: ["executiveSummary", "highlights", "recommendations"],
+        };
+    }
+  };
+
+  const fields = getFields();
+  const tableRows = md[fields.tableKey] as Record<string, unknown>[] | undefined;
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
+        {/* Header */}
+        <View style={[styles.header, { borderTopColor: brandColor }]}>
           <View style={styles.headerRow}>
-            {client.logoUrl ? (
-              <Image src={client.logoUrl} style={styles.logo} />
-            ) : (
-              <View style={[styles.logoPlaceholder, { backgroundColor: brandColor }]}>
-                <Text style={styles.logoInitial}>{clientName.charAt(0)}</Text>
+            <View style={styles.headerLeft}>
+              {client.logoUrl ? (
+                <Image src={client.logoUrl} style={styles.logo} />
+              ) : (
+                <View style={[styles.logoPlaceholder, { backgroundColor: brandColor }]}>
+                  <Text style={styles.logoInitial}>{clientName.charAt(0)}</Text>
+                </View>
+              )}
+              <View>
+                <Text style={styles.clientName}>{clientName}</Text>
+                <Text style={styles.title}>{report.title}</Text>
               </View>
-            )}
-            <View>
-              <Text style={styles.clientName}>{clientName}</Text>
-              <Text style={styles.title}>{report.title}</Text>
             </View>
+            {whiteLabel && agency?.logoUrl && (
+              <Image src={agency.logoUrl} style={styles.agencyLogo} />
+            )}
           </View>
           <View style={styles.metaRow}>
             <View style={styles.badge}>
@@ -298,94 +511,44 @@ export function ReportPDFDocument({ report, client, agency, whiteLabel }: Report
           </View>
         </View>
 
-        {metricsData.summary && (
+        {/* Hero KPIs */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Key Performance Indicators</Text>
+          <MetricCards fields={fields.hero} data={md} />
+        </View>
+
+        {/* Extra Metrics */}
+        {fields.extraMetrics.length > 0 && fields.extraMetrics.some((f) => md[f.key] != null && md[f.key] !== "") && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Key Performance Indicators</Text>
-            <View style={styles.kpiGrid}>
-              <View style={styles.kpiCard}>
-                <Text style={styles.kpiLabel}>Total Sessions</Text>
-                <Text style={styles.kpiValue}>{formatNumber(metricsData.summary.sessions)}</Text>
-                {metricsData.summary.previousSessions !== undefined && (() => {
-                  const change = calculateChange(metricsData.summary.sessions, metricsData.summary.previousSessions!);
-                  return (
-                    <Text style={change >= 0 ? styles.kpiChange : styles.kpiChangeNegative}>
-                      {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs previous
-                    </Text>
-                  );
-                })()}
-              </View>
-              <View style={styles.kpiCard}>
-                <Text style={styles.kpiLabel}>Conversions</Text>
-                <Text style={styles.kpiValue}>{formatNumber(metricsData.summary.conversions)}</Text>
-                {metricsData.summary.previousConversions !== undefined && (() => {
-                  const change = calculateChange(metricsData.summary.conversions, metricsData.summary.previousConversions!);
-                  return (
-                    <Text style={change >= 0 ? styles.kpiChange : styles.kpiChangeNegative}>
-                      {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs previous
-                    </Text>
-                  );
-                })()}
-              </View>
-              {metricsData.summary.revenue !== undefined && (
-                <View style={styles.kpiCard}>
-                  <Text style={styles.kpiLabel}>Revenue</Text>
-                  <Text style={styles.kpiValue}>${formatNumber(metricsData.summary.revenue)}</Text>
-                </View>
-              )}
-            </View>
+            <Text style={styles.sectionTitle}>Detailed Metrics</Text>
+            <MetricCards fields={fields.extraMetrics} data={md} />
           </View>
         )}
 
-        {metricsData.channelBreakdown && metricsData.channelBreakdown.length > 0 && (
+        {/* Data Table */}
+        {tableRows && tableRows.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Channel Breakdown</Text>
-            <View style={styles.channelTable}>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Channel</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Sessions</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>% of Total</Text>
-              </View>
-              {metricsData.channelBreakdown.map((channel, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={[styles.tableCell, { flex: 2 }]}>{channel.channel}</Text>
-                  <Text style={[styles.tableCellValue, { flex: 1 }]}>{formatNumber(channel.sessions)}</Text>
-                  <Text style={[styles.tableCell, { flex: 1 }]}>{channel.percentage || 0}%</Text>
-                </View>
-              ))}
-            </View>
+            <Text style={styles.sectionTitle}>{fields.tableTitle}</Text>
+            <DataTable columns={fields.tableColumns} rows={tableRows} />
           </View>
         )}
 
-        {metricsData.customMetrics && metricsData.customMetrics.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Custom Metrics</Text>
-            <View style={styles.metricsGrid}>
-              {metricsData.customMetrics.map((metric, index) => (
-                <View key={index} style={styles.metricItem}>
-                  <Text style={styles.metricLabel}>{metric.label}</Text>
-                  <Text style={styles.metricValue}>{metric.value}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+        {/* Notes */}
+        <NotesSection data={md} noteKeys={fields.noteKeys} />
 
-        {metricsData.notes && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Executive Summary</Text>
-            <View style={styles.notesBox}>
-              <Text style={styles.notesText}>{metricsData.notes}</Text>
-            </View>
-          </View>
-        )}
-
+        {/* Footer */}
         <View style={styles.footer} fixed>
           {whiteLabel && agency?.name ? (
-            <Text style={styles.footerText}>Generated by {agency.name}{agency?.website ? ` · ${agency.website}` : ''}</Text>
+            <View style={styles.footerLeft}>
+              {agency.logoUrl && (
+                <Image src={agency.logoUrl} style={styles.footerLogo} />
+              )}
+              <Text style={styles.footerText}>Generated by {agency.name}{agency.website ? ` · ${agency.website}` : ''}</Text>
+            </View>
           ) : (
             <Text style={styles.footerText}>Generated with ReportFlow · reportflow.io</Text>
           )}
-          <Text style={styles.poweredBy}>Page {1}</Text>
+          <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
     </Document>

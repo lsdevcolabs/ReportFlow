@@ -348,6 +348,16 @@ export default function PublicReportClient({ shareToken }: { shareToken: string 
                 </div>
               </div>
 
+              {/* Agency branding */}
+              {report.agency?.whiteLabel && report.agency?.logoUrl && (
+                <img
+                  src={report.agency.logoUrl}
+                  alt={report.agency.name || "Agency"}
+                  className="h-10 w-auto object-contain shrink-0"
+                />
+              )}
+            </div>
+
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
@@ -358,7 +368,6 @@ export default function PublicReportClient({ shareToken }: { shareToken: string 
                 {report.status}
               </Badge>
             </div>
-          </div>
           </div>
 
           {/* Content */}

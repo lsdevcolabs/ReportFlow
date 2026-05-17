@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { reports, clients, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { canUseWhiteLabel } from "@/lib/plans";
+import { getUserById } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +30,7 @@ export async function GET(
           logoUrl: clients.logoUrl,
           brandColor: clients.brandColor,
         },
-        user: {
-          plan: users.plan,
-          agencyName: users.agencyName,
-          agencyWebsite: users.agencyWebsite,
-          agencyLogoUrl: users.agencyLogoUrl,
-          agencyBrandColor: users.agencyBrandColor,
-        },
+        userId: users.id,
       })
       .from(reports)
       .innerJoin(clients, eq(reports.clientId, clients.id))
@@ -55,7 +50,17 @@ export async function GET(
       );
     }
 
-    const { report, client, user } = result[0];
+    const { report, client, userId } = result[0];
+
+    // Use getUserById to apply superuser overrides
+    const user = await getUserById(userId);
+    if (!user) {
+      return NextResponse.json(
+        { error: "Report owner not found" },
+        { status: 404 }
+      );
+    }
+
     const plan = user.plan as "free" | "starter" | "pro";
     const whiteLabel = canUseWhiteLabel(plan);
 
