@@ -1,23 +1,30 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEYS = [
-  process.env.GEMINI_API_KEY_1!,
-  process.env.GEMINI_API_KEY_2!,
-  process.env.GEMINI_API_KEY_3!,
-].filter(Boolean);
+function getApiKeys(): string[] {
+  const keys = [
+    process.env.GEMINI_API_KEY_1,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+  ].filter(Boolean) as string[];
 
-if (API_KEYS.length === 0) {
-  throw new Error("No Gemini API keys configured. Set GEMINI_API_KEY_1, _2, _3 in .env.local");
+  if (keys.length === 0) {
+    console.warn("No Gemini API keys configured. Ensure they are set in the environment.");
+    // Return empty so the runtime can handle it, or throw.
+    // It's safer to throw here because it's called inside generateWithGemini
+    throw new Error("No Gemini API keys configured. Set GEMINI_API_KEY_1, _2, _3 in environment.");
+  }
+  return keys;
 }
 
 let currentKeyIndex = 0;
 
 export async function generateWithGemini(prompt: string): Promise<string> {
+  const apiKeys = getApiKeys();
   const startIndex = currentKeyIndex;
 
-  for (let attempt = 0; attempt < API_KEYS.length; attempt++) {
-    const keyIndex = (startIndex + attempt) % API_KEYS.length;
-    const apiKey = API_KEYS[keyIndex];
+  for (let attempt = 0; attempt < apiKeys.length; attempt++) {
+    const keyIndex = (startIndex + attempt) % apiKeys.length;
+    const apiKey = apiKeys[keyIndex];
 
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
@@ -39,7 +46,7 @@ export async function generateWithGemini(prompt: string): Promise<string> {
         throw new Error("Empty response from Gemini");
       }
 
-      currentKeyIndex = (keyIndex + 1) % API_KEYS.length;
+      currentKeyIndex = (keyIndex + 1) % apiKeys.length;
 
       return text.trim();
 
@@ -51,14 +58,14 @@ export async function generateWithGemini(prompt: string): Promise<string> {
         error?.message?.toLowerCase().includes("rate limit") ||
         error?.message?.toLowerCase().includes("resource_exhausted");
 
-      if (isRateLimit && attempt < API_KEYS.length - 1) {
+      if (isRateLimit && attempt < apiKeys.length - 1) {
         console.warn(
-          `[Gemini] Key ${keyIndex + 1} rate limited (429). Trying key ${((keyIndex + 1) % API_KEYS.length) + 1}...`
+          `[Gemini] Key ${keyIndex + 1} rate limited (429). Trying key ${((keyIndex + 1) % apiKeys.length) + 1}...`
         );
         continue;
       }
 
-      if (attempt === API_KEYS.length - 1) {
+      if (attempt === apiKeys.length - 1) {
         console.error("[Gemini] All API keys exhausted or encountered errors:", error?.message);
         throw new Error("AI generation temporarily unavailable. All API keys are at their limit. Please try again later.");
       }
