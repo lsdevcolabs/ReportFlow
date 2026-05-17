@@ -60,6 +60,10 @@ export async function getUserById(userId: string) {
     .where(eq(users.id, userId))
     .limit(1);
 
+  if (user?.email && process.env.SUPERUSER_EMAIL && user.email.toLowerCase() === process.env.SUPERUSER_EMAIL.toLowerCase()) {
+    return { ...user, plan: "pro", subscriptionStatus: "active" };
+  }
+
   return user || null;
 }
 

@@ -65,7 +65,8 @@ interface ReportData {
   status: string;
   createdAt: string;
   shareToken: string | null;
-  metricsData: MetricsData;
+  metricsData: Record<string, unknown>;
+  templateType?: string;
   lastSentAt?: string | null;
   lastSentTo?: string | null;
   client?: {
@@ -324,7 +325,206 @@ export default function ReportDetailPage() {
     }
   };
 
+  const md = metricsData || {};
+  const templateType = report.templateType || "general";
+
   const formatNumber = (num: number) => num.toLocaleString();
+  const formatCurrency = (num: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
+
+  const calculateChange = (current: number, previous: number) => {
+    if (!previous) return 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const renderMetricCard = (label: string, value: string, prevValue?: number, currentValue?: number) => (
+    <Card>
+      <CardContent className="p-5">
+        <p className="text-sm text-muted-foreground mb-1">{label}</p>
+        <p className="text-2xl font-bold">{value}</p>
+        {prevValue != null && currentValue != null && prevValue > 0 && (
+          <p className={`text-xs mt-1 ${calculateChange(currentValue, prevValue) >= 0 ? "text-green-600" : "text-red-600"}`}>
+            {calculateChange(currentValue, prevValue) >= 0 ? "+" : ""}
+            {calculateChange(currentValue, prevValue).toFixed(1)}% vs previous
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const renderMetricSection = (fields: Array<{ key: string; label: string; type: string }>, data: Record<string, unknown>, maxCards?: number) => {
+    const numericFields = fields.filter((f) => f.type === "number" || f.type === "currency" || f.type === "percentage");
+    const displayFields = maxCards ? numericFields.slice(0, maxCards) : numericFields;
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {displayFields.map((field) => {
+          const val = data[field.key];
+          if (val == null || val === "") return null;
+
+          let displayVal: string;
+          if (field.type === "currency") {
+            displayVal = formatCurrency(Number(val));
+          } else if (field.type === "percentage") {
+            displayVal = `${val}%`;
+          } else {
+            displayVal = formatNumber(Number(val));
+          }
+
+          const prevVal = data[`prev_${field.key}`];
+          const prevNum = prevVal != null ? Number(prevVal) : undefined;
+          const currNum = Number(val);
+
+          return renderMetricCard(field.label, displayVal, prevNum, currNum);
+        })}
+      </div>
+    );
+  };
+
+  const renderDynamicTable = (rows: Record<string, unknown>[], columns: { key: string; label: string }[]) => {
+    if (!rows || rows.length === 0) return null;
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-slate-50">
+              {columns.map((col) => (
+                <th key={col.key} className="text-left p-3 text-xs font-medium text-muted-foreground uppercase">
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={idx} className="border-b">
+                {columns.map((col) => (
+                  <td key={col.key} className="p-3">
+                    {row[col.key] != null ? String(row[col.key]) : "-"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderNotes = (notesData: Record<string, unknown>, noteKeys: string[]) => {
+    const hasNotes = noteKeys.some((key) => notesData[key]);
+    if (!hasNotes) return null;
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Notes & Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {noteKeys.map((key) => {
+            const val = notesData[key];
+            if (!val) return null;
+            return (
+              <div key={key}>
+                <p className="text-sm font-medium mb-1 capitalize">
+                  {key.replace(/([A-Z])/g, " $1").trim()}
+                </p>
+                <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed text-sm">
+                  {String(val)}
+                </p>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const getTemplateFields = () => {
+    switch (templateType) {
+      case "seo":
+        return {
+          heroFields: [
+            { key: "organicSessions", label: "Organic Sessions", type: "number" },
+            { key: "googleImpressions", label: "Google Impressions", type: "number" },
+            { key: "googleClicks", label: "Google Clicks", type: "number" },
+            { key: "avgPosition", label: "Average Position", type: "number" },
+            { key: "ctr", label: "CTR", type: "percentage" },
+            { key: "organicConversions", label: "Organic Conversions", type: "number" },
+          ],
+          keywordColumns: [
+            { key: "keyword", label: "Keyword" },
+            { key: "currentPosition", label: "Position" },
+            { key: "previousPosition", label: "Prev Position" },
+            { key: "searchVolume", label: "Volume" },
+            { key: "urlRanking", label: "URL" },
+            { key: "status", label: "Status" },
+          ],
+          noteKeys: ["executiveSummary", "keyWins", "issues", "actionPlan"],
+        };
+      case "paidAds":
+        return {
+          heroFields: [
+            { key: "totalAdSpend", label: "Total Ad Spend", type: "currency" },
+            { key: "totalConversions", label: "Total Conversions", type: "number" },
+            { key: "overallRoas", label: "Overall ROAS", type: "number" },
+            { key: "overallCpa", label: "Overall CPA", type: "currency" },
+            { key: "totalRevenue", label: "Total Revenue", type: "currency" },
+            { key: "totalImpressions", label: "Total Impressions", type: "number" },
+          ],
+          campaignColumns: [
+            { key: "campaignName", label: "Campaign" },
+            { key: "platform", label: "Platform" },
+            { key: "spend", label: "Spend" },
+            { key: "impressions", label: "Impressions" },
+            { key: "clicks", label: "Clicks" },
+            { key: "conversions", label: "Conversions" },
+            { key: "cpa", label: "CPA" },
+            { key: "roas", label: "ROAS" },
+            { key: "status", label: "Status" },
+          ],
+          noteKeys: ["executiveSummary", "topCampaign", "budgetRecommendation", "creativeNotes"],
+        };
+      case "socialMedia":
+        return {
+          heroFields: [
+            { key: "totalFollowers", label: "Total Followers", type: "number" },
+            { key: "totalReach", label: "Total Reach", type: "number" },
+            { key: "totalImpressions", label: "Total Impressions", type: "number" },
+            { key: "totalEngagements", label: "Total Engagements", type: "number" },
+            { key: "engagementRate", label: "Engagement Rate", type: "percentage" },
+            { key: "postsPublished", label: "Posts Published", type: "number" },
+          ],
+          contentColumns: [
+            { key: "postDescription", label: "Post" },
+            { key: "platform", label: "Platform" },
+            { key: "contentType", label: "Type" },
+            { key: "reach", label: "Reach" },
+            { key: "engagements", label: "Engagements" },
+            { key: "engagementRate", label: "Eng. Rate" },
+            { key: "linkClicks", label: "Link Clicks" },
+          ],
+          noteKeys: ["executiveSummary", "topContentHighlight", "growthObservations", "contentStrategy"],
+        };
+      default: // general
+        return {
+          heroFields: [
+            { key: "totalSessions", label: "Total Sessions", type: "number" },
+            { key: "totalConversions", label: "Total Conversions", type: "number" },
+            { key: "totalRevenue", label: "Total Revenue", type: "currency" },
+            { key: "bounceRate", label: "Bounce Rate", type: "percentage" },
+          ],
+          channelColumns: [
+            { key: "name", label: "Channel" },
+            { key: "sessions", label: "Sessions" },
+          ],
+          noteKeys: ["executiveSummary", "highlights", "recommendations"],
+        };
+    }
+  };
+
+  const templateFields = getTemplateFields();
 
   return (
     <div className="p-8 space-y-8 max-w-5xl mx-auto">
@@ -452,113 +652,248 @@ export default function ReportDetailPage() {
         </CardContent>
       </Card>
 
-      {/* KPI Cards */}
-      {metricsData.summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Total Sessions</p>
-              <p className="text-2xl font-bold">{formatNumber(metricsData.summary.sessions)}</p>
-              {metricsData.summary.previousSessions && (() => {
-                const change = ((metricsData.summary.sessions - metricsData.summary.previousSessions) / metricsData.summary.previousSessions) * 100;
-                return (
-                  <p className={`text-xs ${change >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs prev
-                  </p>
-                );
-              })()}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Conversions</p>
-              <p className="text-2xl font-bold">{formatNumber(metricsData.summary.conversions)}</p>
-              {metricsData.summary.previousConversions && (() => {
-                const change = ((metricsData.summary.conversions - metricsData.summary.previousConversions) / metricsData.summary.previousConversions) * 100;
-                return (
-                  <p className={`text-xs ${change >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {change >= 0 ? "+" : ""}{change.toFixed(1)}% vs prev
-                  </p>
-                );
-              })()}
-            </CardContent>
-          </Card>
-          {metricsData.summary.revenue !== undefined && (
-            <>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Revenue</p>
-                  <p className="text-2xl font-bold">${formatNumber(metricsData.summary.revenue)}</p>
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </div>
-      )}
+      {/* Hero KPI Cards */}
+      {renderMetricSection(templateFields.heroFields, md, 4)}
 
-      {/* Charts */}
-      {metricsData.channelBreakdown && metricsData.channelBreakdown.length > 0 && (
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Channel Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={metricsData.channelBreakdown}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="channel" axisLine={false} tickLine={false} />
-                    <YAxis axisLine={false} tickLine={false} />
-                    <Tooltip />
-                    <Bar dataKey="sessions" radius={[4, 4, 0, 0]}>
-                      {metricsData.channelBreakdown.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={clientBrandColor} fillOpacity={1 - index * 0.15} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Custom Metrics */}
-      {metricsData.customMetrics && metricsData.customMetrics.length > 0 && (
+      {/* General: Channel Breakdown */}
+      {templateType === "general" && md.channels && Array.isArray(md.channels) && (md.channels as unknown[]).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Custom Metrics</CardTitle>
+            <CardTitle>Channel Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {metricsData.customMetrics.map((metric, index) => (
-                <div key={index}>
-                  <p className="text-sm text-muted-foreground">{metric.label}</p>
-                  <p className="text-lg font-semibold">{metric.value}</p>
-                  {metric.change && (
-                    <p className={`text-xs ${metric.changeType === "positive" ? "text-green-600" : metric.changeType === "negative" ? "text-red-600" : "text-muted-foreground"}`}>
-                      {metric.change}
-                    </p>
-                  )}
-                </div>
-              ))}
+            <div className="h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={md.channels as Array<{ name: string; sessions: number }>}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(value) => formatNumber(value as number)} />
+                  <Bar dataKey="sessions" radius={[4, 4, 0, 0]}>
+                    {(md.channels as Array<{ name: string; sessions: number }>).map((_, index) => (
+                      <Cell key={index} fill={clientBrandColor} fillOpacity={1 - index * 0.15} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Executive Summary */}
-      {metricsData.notes && (
+      {/* General: Traffic Breakdown */}
+      {templateType === "general" && (
+        <>
+          {renderMetricSection(
+            [
+              { key: "organicTraffic", label: "Organic Traffic", type: "number" },
+              { key: "paidTraffic", label: "Paid Traffic", type: "number" },
+              { key: "directTraffic", label: "Direct Traffic", type: "number" },
+              { key: "referralTraffic", label: "Referral Traffic", type: "number" },
+              { key: "socialTraffic", label: "Social Traffic", type: "number" },
+              { key: "emailTraffic", label: "Email Traffic", type: "number" },
+            ],
+            md
+          )}
+          {renderMetricSection(
+            [
+              { key: "leads", label: "Leads / Form Submissions", type: "number" },
+              { key: "ecommerceTransactions", label: "E-commerce Transactions", type: "number" },
+              { key: "revenueGenerated", label: "Revenue Generated", type: "currency" },
+              { key: "conversionRate", label: "Conversion Rate", type: "percentage" },
+              { key: "costPerConversion", label: "Cost Per Conversion", type: "currency" },
+            ],
+            md
+          )}
+        </>
+      )}
+
+      {/* SEO: Keyword Rankings Table */}
+      {templateType === "seo" && md.keywordRows && Array.isArray(md.keywordRows) && (md.keywordRows as unknown[]).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Executive Summary</CardTitle>
+            <CardTitle>Keyword Rankings</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground whitespace-pre-wrap">{metricsData.notes}</p>
+            {renderDynamicTable(
+              md.keywordRows as Record<string, unknown>[],
+              templateFields.keywordColumns!
+            )}
           </CardContent>
         </Card>
       )}
+
+      {/* SEO: Technical Health & Backlinks */}
+      {templateType === "seo" && (
+        <>
+          {renderMetricSection(
+            [
+              { key: "lcp", label: "LCP", type: "text" },
+              { key: "cls", label: "CLS", type: "text" },
+              { key: "inp", label: "INP", type: "text" },
+              { key: "pagesIndexed", label: "Pages Indexed", type: "number" },
+              { key: "speedMobile", label: "Mobile Speed", type: "number" },
+              { key: "speedDesktop", label: "Desktop Speed", type: "number" },
+            ],
+            md
+          )}
+          {renderMetricSection(
+            [
+              { key: "totalBacklinks", label: "Total Backlinks", type: "number" },
+              { key: "newBacklinks", label: "New Backlinks", type: "number" },
+              { key: "referringDomains", label: "Referring Domains", type: "number" },
+              { key: "domainAuthority", label: "Domain Authority", type: "number" },
+              { key: "domainRating", label: "Domain Rating", type: "number" },
+            ],
+            md
+          )}
+        </>
+      )}
+
+      {/* Paid Ads: Google vs Meta comparison */}
+      {templateType === "paidAds" && (
+        <>
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Google Ads</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderMetricSection(
+                  [
+                    { key: "googleSpend", label: "Spend", type: "currency" },
+                    { key: "googleImpressions", label: "Impressions", type: "number" },
+                    { key: "googleClicks", label: "Clicks", type: "number" },
+                    { key: "googleConversions", label: "Conversions", type: "number" },
+                    { key: "googleRoas", label: "ROAS", type: "number" },
+                  ],
+                  md
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Meta Ads</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderMetricSection(
+                  [
+                    { key: "metaSpend", label: "Spend", type: "currency" },
+                    { key: "metaImpressions", label: "Impressions", type: "number" },
+                    { key: "metaClicks", label: "Clicks", type: "number" },
+                    { key: "metaConversions", label: "Conversions", type: "number" },
+                    { key: "metaRoas", label: "ROAS", type: "number" },
+                  ],
+                  md
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Campaign Performance Table */}
+          {md.campaignRows && Array.isArray(md.campaignRows) && (md.campaignRows as unknown[]).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Campaign Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderDynamicTable(
+                  md.campaignRows as Record<string, unknown>[],
+                  templateFields.campaignColumns!
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* Social Media: Platform Metrics */}
+      {templateType === "socialMedia" && md.enabledPlatforms && (
+        <>
+          {/* Per-platform cards */}
+          {[
+            { id: "instagram", label: "Instagram", fields: [
+              { key: "igFollowers", label: "Followers" }, { key: "igReach", label: "Reach" },
+              { key: "igImpressions", label: "Impressions" }, { key: "igEngagementRate", label: "Engagement Rate" },
+            ]},
+            { id: "facebook", label: "Facebook", fields: [
+              { key: "fbPageLikesFollowers", label: "Followers" }, { key: "fbPostReach", label: "Reach" },
+              { key: "fbPostImpressions", label: "Impressions" }, { key: "fbEngagementRate", label: "Engagement Rate" },
+            ]},
+            { id: "linkedin", label: "LinkedIn", fields: [
+              { key: "liFollowers", label: "Followers" }, { key: "liPostImpressions", label: "Impressions" },
+              { key: "liEngagementRate", label: "Engagement Rate" },
+            ]},
+            { id: "tikTok", label: "TikTok", fields: [
+              { key: "ttFollowers", label: "Followers" }, { key: "ttVideoViews", label: "Video Views" },
+              { key: "ttEngagementRate", label: "Engagement Rate" },
+            ]},
+            { id: "xTwitter", label: "X / Twitter", fields: [
+              { key: "xFollowers", label: "Followers" }, { key: "xImpressions", label: "Impressions" },
+              { key: "xEngagementRate", label: "Engagement Rate" },
+            ]},
+            { id: "youtube", label: "YouTube", fields: [
+              { key: "ytSubscribers", label: "Subscribers" }, { key: "ytViews", label: "Views" },
+              { key: "ytCtr", label: "CTR" },
+            ]},
+          ].map((platform) => {
+            const enabled = (md.enabledPlatforms as Record<string, boolean>)[platform.id];
+            if (!enabled) return null;
+
+            return (
+              <Card key={platform.id}>
+                <CardHeader>
+                  <CardTitle className="text-base">{platform.label}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {platform.fields.map((field) => {
+                      const val = md[field.key];
+                      if (val == null) return null;
+                      return (
+                        <div key={field.key} className="p-3 rounded-lg bg-slate-50">
+                          <p className="text-xs text-muted-foreground">{field.label}</p>
+                          <p className="text-lg font-bold">{String(val)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          {/* Content Performance Table */}
+          {md.contentRows && Array.isArray(md.contentRows) && (md.contentRows as unknown[]).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Content Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderDynamicTable(
+                  md.contentRows as Record<string, unknown>[],
+                  templateFields.contentColumns!
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Audience & Growth */}
+          {renderMetricSection(
+            [
+              { key: "totalAudienceSize", label: "Total Audience", type: "number" },
+              { key: "netFollowerGrowth", label: "Net Follower Growth", type: "number" },
+              { key: "followerGrowthRate", label: "Growth Rate", type: "percentage" },
+              { key: "websiteTrafficFromSocial", label: "Website Traffic from Social", type: "number" },
+              { key: "socialConversions", label: "Social Conversions", type: "number" },
+            ],
+            md
+          )}
+        </>
+      )}
+
+      {/* Notes / Executive Summary */}
+      {renderNotes(md, templateFields.noteKeys)}
 
       {/* Send to Client Dialog */}
       <Dialog open={isSendOpen} onOpenChange={setIsSendOpen}>
