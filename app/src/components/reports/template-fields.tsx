@@ -289,12 +289,12 @@ export function DynamicTable({ columns, rows, maxRows, onChange }: DynamicTableP
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto pb-4">
+        <table className="w-full text-sm min-w-[800px]">
           <thead>
             <tr className="border-b">
               {columns.map((col) => (
-                <th key={col.key} className="text-left p-2 text-muted-foreground font-medium text-xs">
+                <th key={col.key} className="text-left p-2 text-muted-foreground font-medium text-xs whitespace-nowrap">
                   {col.label}
                 </th>
               ))}
@@ -311,7 +311,7 @@ export function DynamicTable({ columns, rows, maxRows, onChange }: DynamicTableP
                         value={(row[col.key] as string) || ""}
                         onValueChange={(v) => updateCell(rowIdx, col.key, v)}
                       >
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-8 text-xs min-w-[120px]">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -325,7 +325,7 @@ export function DynamicTable({ columns, rows, maxRows, onChange }: DynamicTableP
                     ) : (
                       <Input
                         type={col.type === "number" ? "number" : "text"}
-                        className="h-8 text-xs"
+                        className="h-8 text-xs min-w-[100px]"
                         placeholder={col.type === "number" ? "0" : ""}
                         value={row[col.key] != null ? String(row[col.key]) : ""}
                         onChange={(e) => {

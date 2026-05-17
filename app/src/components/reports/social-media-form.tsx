@@ -37,11 +37,13 @@ export function SocialMediaForm({ metricsData, onChange, clientId, onGenerateAiS
   return (
     <div className="space-y-6">
       <Tabs defaultValue="overview">
-        <TabsList className="flex flex-wrap sm:grid sm:grid-cols-5 mb-6 h-auto">
-          {template.tabs.map((tab) => (
-            <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="overflow-x-auto pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-full justify-start sm:w-auto h-auto min-w-max">
+            {template.tabs.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
         <TabsContent value="overview">
           <Card>
