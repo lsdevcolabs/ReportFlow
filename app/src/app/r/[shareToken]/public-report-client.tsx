@@ -359,6 +359,7 @@ export default function PublicReportClient({ shareToken }: { shareToken: string 
               </Badge>
             </div>
           </div>
+          </div>
 
           {/* Content */}
           <div className="p-6 sm:p-10 space-y-8">
