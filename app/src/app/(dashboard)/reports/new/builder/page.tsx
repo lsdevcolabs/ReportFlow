@@ -261,19 +261,51 @@ function NewReportPageContent() {
 
       // Apply CSV data to metricsData
       if (rows.length > 0) {
-        // Find the row matching the selected client by "company name" / "client name" column
+        // Build field lookup from template: normalized label -> field key
+        const fieldByLabel = new Map<string, string>();
+        const fieldByKey = new Map<string, string>();
+        for (const tab of template.tabs) {
+          if (tab.fields) {
+            for (const field of tab.fields) {
+              const normLabel = field.label.replace(/[^a-z0-9]/g, "").toLowerCase();
+              fieldByLabel.set(normLabel, field.key);
+              fieldByKey.set(field.key.toLowerCase(), field.key);
+            }
+          }
+        }
+
+        // Find the row matching the selected client
         let matchedRow = rows[0];
-        if (rows.length > 1 && clientId && selectedClient) {
-          const clientNameLower = selectedClient.name.toLowerCase();
-          const companyNameKey = Object.keys(rows[0]).find(
-            (k) => k === "company name" || k === "client name" || k === "client" || k === "company"
-          );
-          if (companyNameKey) {
-            const found = rows.find(
-              (r) => (r[companyNameKey] || "").toLowerCase().trim() === clientNameLower
+        if (rows.length > 1 && clientId) {
+          const client = clients.find((c) => c.id === clientId);
+          if (client) {
+            const clientLower = client.name.toLowerCase().trim();
+            // Strategy 1: exact match on company/client name column
+            const nameKey = Object.keys(rows[0]).find(
+              (k) => k === "company name" || k === "client name" || k === "client" || k === "company"
             );
-            if (found) {
-              matchedRow = found;
+            if (nameKey) {
+              const found = rows.find(
+                (r) => (r[nameKey] || "").toLowerCase().trim() === clientLower
+              );
+              if (found) {
+                matchedRow = found;
+              } else {
+                // Strategy 2: contains match on company/client name column
+                const found2 = rows.find((r) => {
+                  const val = (r[nameKey] || "").toLowerCase().trim();
+                  return val.includes(clientLower) || clientLower.includes(val);
+                });
+                if (found2) matchedRow = found2;
+              }
+            } else {
+              // Strategy 3: search all values in each row for client name
+              const found = rows.find((r) =>
+                Object.values(r).some(
+                  (v) => v.toLowerCase().trim() === clientLower
+                )
+              );
+              if (found) matchedRow = found;
             }
           }
         }
@@ -285,44 +317,57 @@ function NewReportPageContent() {
           const valStr = matchedRow[header];
           if (!valStr) return;
 
-          // Try to match header to any field key in the template
           const normalizedHeader = header.replace(/[^a-z0-9]/g, "").toLowerCase();
-          const cleanVal = parseFloat(valStr.replace(/[$,%]/g, ""));
 
-          if (!isNaN(cleanVal)) {
-            // Search through template tabs for matching field
-            let matched = false;
-            for (const tab of template.tabs) {
-              if (matched) break;
-              if (tab.fields) {
-                for (const field of tab.fields) {
-                  const normalizedLabel = field.label.replace(/[^a-z0-9]/g, "").toLowerCase();
-                  if (normalizedLabel === normalizedHeader || normalizedHeader.includes(field.key.toLowerCase())) {
-                    newMetrics[field.key] = cleanVal;
-                    updated = true;
-                    matched = true;
-                    break;
-                  }
-                }
-              }
-            }
-          }
-
+          // Handle special non-metric fields
           if (header === "report title" || header === "title") {
             setTitle(valStr);
             updated = true;
-          } else if (header === "start date" || header === "startdate") {
+            return;
+          }
+          if (header === "start date" || header === "startdate") {
             const d = new Date(valStr);
             if (!isNaN(d.getTime())) {
               setDateRangeStart(d.toISOString().split("T")[0]);
               updated = true;
             }
-          } else if (header === "end date" || header === "enddate") {
+            return;
+          }
+          if (header === "end date" || header === "enddate") {
             const d = new Date(valStr);
             if (!isNaN(d.getTime())) {
               setDateRangeEnd(d.toISOString().split("T")[0]);
               updated = true;
             }
+            return;
+          }
+          if (normalizedHeader === "companyname" || normalizedHeader === "clientname" || normalizedHeader === "client" || normalizedHeader === "company") {
+            return;
+          }
+
+          // Parse numeric value
+          const cleanVal = parseFloat(valStr.replace(/[$,%]/g, ""));
+          if (isNaN(cleanVal)) return;
+
+          // Match header to template field: exact label match first, then by key
+          let fieldKey: string | undefined;
+          if (fieldByLabel.has(normalizedHeader)) {
+            fieldKey = fieldByLabel.get(normalizedHeader);
+          } else if (fieldByKey.has(normalizedHeader)) {
+            fieldKey = fieldByKey.get(normalizedHeader);
+          } else {
+            // Substring: check if header contains a field key
+            for (const [keyLower, key] of fieldByKey) {
+              if (normalizedHeader.includes(keyLower)) {
+                fieldKey = key;
+                break;
+              }
+            }
+          }
+
+          if (fieldKey) {
+            newMetrics[fieldKey] = cleanVal;
+            updated = true;
           }
         });
 
