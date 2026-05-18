@@ -261,7 +261,23 @@ function NewReportPageContent() {
 
       // Apply CSV data to metricsData
       if (rows.length > 0) {
-        const matchedRow = rows[0];
+        // Find the row matching the selected client by "company name" / "client name" column
+        let matchedRow = rows[0];
+        if (rows.length > 1 && clientId && selectedClient) {
+          const clientNameLower = selectedClient.name.toLowerCase();
+          const companyNameKey = Object.keys(rows[0]).find(
+            (k) => k === "company name" || k === "client name" || k === "client" || k === "company"
+          );
+          if (companyNameKey) {
+            const found = rows.find(
+              (r) => (r[companyNameKey] || "").toLowerCase().trim() === clientNameLower
+            );
+            if (found) {
+              matchedRow = found;
+            }
+          }
+        }
+
         const newMetrics = { ...metricsData };
         let updated = false;
 
@@ -275,13 +291,16 @@ function NewReportPageContent() {
 
           if (!isNaN(cleanVal)) {
             // Search through template tabs for matching field
+            let matched = false;
             for (const tab of template.tabs) {
+              if (matched) break;
               if (tab.fields) {
                 for (const field of tab.fields) {
                   const normalizedLabel = field.label.replace(/[^a-z0-9]/g, "").toLowerCase();
-                  if (normalizedLabel.includes(normalizedHeader) || normalizedHeader.includes(field.key.toLowerCase())) {
+                  if (normalizedLabel === normalizedHeader || normalizedHeader.includes(field.key.toLowerCase())) {
                     newMetrics[field.key] = cleanVal;
                     updated = true;
+                    matched = true;
                     break;
                   }
                 }
@@ -496,7 +515,24 @@ function NewReportPageContent() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium">Import from CSV</p>
-                    <p className="text-xs text-muted-foreground">Upload a CSV file to auto-populate metrics.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Upload a CSV file to auto-populate metrics.{" "}
+                      <a
+                        href={
+                          templateId === "seo"
+                            ? "/presets/seo-report-preset.csv"
+                            : templateId === "paidAds"
+                            ? "/presets/paid-ads-preset.csv"
+                            : templateId === "socialMedia"
+                            ? "/presets/social-media-preset.csv"
+                            : "/presets/general-report-preset.csv"
+                        }
+                        download
+                        className="text-primary hover:underline font-semibold"
+                      >
+                        Download Template
+                      </a>
+                    </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                     <Upload className="mr-2 h-4 w-4" />

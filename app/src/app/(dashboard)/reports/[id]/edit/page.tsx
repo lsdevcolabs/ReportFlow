@@ -255,7 +255,23 @@ function EditReportPageContent() {
       }
 
       if (rows.length > 0) {
-        const matchedRow = rows[0];
+        // Find the row matching the selected client by "company name" / "client name" column
+        let matchedRow = rows[0];
+        if (rows.length > 1 && clientId && selectedClient) {
+          const clientNameLower = selectedClient.name.toLowerCase();
+          const companyNameKey = Object.keys(rows[0]).find(
+            (k) => k === "company name" || k === "client name" || k === "client" || k === "company"
+          );
+          if (companyNameKey) {
+            const found = rows.find(
+              (r) => (r[companyNameKey] || "").toLowerCase().trim() === clientNameLower
+            );
+            if (found) {
+              matchedRow = found;
+            }
+          }
+        }
+
         const newMetrics = { ...metricsData };
         let updated = false;
 
@@ -267,13 +283,16 @@ function EditReportPageContent() {
           const cleanVal = parseFloat(valStr.replace(/[$,%]/g, ""));
 
           if (!isNaN(cleanVal)) {
+            let matched = false;
             for (const tab of template.tabs) {
+              if (matched) break;
               if (tab.fields) {
                 for (const field of tab.fields) {
                   const normalizedLabel = field.label.replace(/[^a-z0-9]/g, "").toLowerCase();
-                  if (normalizedLabel.includes(normalizedHeader) || normalizedHeader.includes(field.key.toLowerCase())) {
+                  if (normalizedLabel === normalizedHeader || normalizedHeader.includes(field.key.toLowerCase())) {
                     newMetrics[field.key] = cleanVal;
                     updated = true;
+                    matched = true;
                     break;
                   }
                 }
