@@ -261,18 +261,19 @@ function NewReportPageContent() {
 
       // Apply CSV data to metricsData
       if (rows.length > 0) {
-        // Build field lookup from template: normalized label -> field key
-        const fieldByLabel = new Map<string, string>();
-        const fieldByKey = new Map<string, string>();
+        // Build field lookup: normalized label -> field key
+        // Also build label list sorted longest-first for best substring match
+        const labelEntries: { norm: string; key: string }[] = [];
         for (const tab of template.tabs) {
           if (tab.fields) {
             for (const field of tab.fields) {
-              const normLabel = field.label.replace(/[^a-z0-9]/g, "").toLowerCase();
-              fieldByLabel.set(normLabel, field.key);
-              fieldByKey.set(field.key.toLowerCase(), field.key);
+              const norm = field.label.toLowerCase().replace(/[^a-z0-9]/g, "");
+              labelEntries.push({ norm, key: field.key });
             }
           }
         }
+        // Sort longest first so "total ad spend" matches before "ad spend"
+        labelEntries.sort((a, b) => b.norm.length - a.norm.length);
 
         // Find the row matching the selected client
         let matchedRow = rows[0];
@@ -280,7 +281,6 @@ function NewReportPageContent() {
           const client = clients.find((c) => c.id === clientId);
           if (client) {
             const clientLower = client.name.toLowerCase().trim();
-            // Strategy 1: exact match on company/client name column
             const nameKey = Object.keys(rows[0]).find(
               (k) => k === "company name" || k === "client name" || k === "client" || k === "company"
             );
@@ -291,7 +291,6 @@ function NewReportPageContent() {
               if (found) {
                 matchedRow = found;
               } else {
-                // Strategy 2: contains match on company/client name column
                 const found2 = rows.find((r) => {
                   const val = (r[nameKey] || "").toLowerCase().trim();
                   return val.includes(clientLower) || clientLower.includes(val);
@@ -299,7 +298,6 @@ function NewReportPageContent() {
                 if (found2) matchedRow = found2;
               }
             } else {
-              // Strategy 3: search all values in each row for client name
               const found = rows.find((r) =>
                 Object.values(r).some(
                   (v) => v.toLowerCase().trim() === clientLower
@@ -349,17 +347,41 @@ function NewReportPageContent() {
           const cleanVal = parseFloat(valStr.replace(/[$,%]/g, ""));
           if (isNaN(cleanVal)) return;
 
-          // Match header to template field: exact label match first, then by key
+          // Match CSV header to template field
           let fieldKey: string | undefined;
-          if (fieldByLabel.has(normalizedHeader)) {
-            fieldKey = fieldByLabel.get(normalizedHeader);
-          } else if (fieldByKey.has(normalizedHeader)) {
-            fieldKey = fieldByKey.get(normalizedHeader);
-          } else {
-            // Substring: check if header contains a field key
-            for (const [keyLower, key] of fieldByKey) {
-              if (normalizedHeader.includes(keyLower)) {
-                fieldKey = key;
+          // 1) Exact label match
+          for (const entry of labelEntries) {
+            if (entry.norm === normalizedHeader) {
+              fieldKey = entry.key;
+              break;
+            }
+          }
+          // 2) CSV header contains template label (e.g. "google impressions" contains "impressions")
+          if (!fieldKey) {
+            const candidates: string[] = [];
+            for (const entry of labelEntries) {
+              if (normalizedHeader.includes(entry.norm)) {
+                candidates.push(entry.key);
+              }
+            }
+            if (candidates.length === 1) {
+              fieldKey = candidates[0];
+            } else if (candidates.length > 1) {
+              // Prefer key that shares a platform prefix with the CSV header
+              const platforms = ["meta", "google", "fb", "ig", "li", "tt", "x", "yt"];
+              const headerPlatform = platforms.find((p) => normalizedHeader.startsWith(p));
+              if (headerPlatform) {
+                const platformMatch = candidates.find((k) => k.toLowerCase().startsWith(headerPlatform));
+                if (platformMatch) fieldKey = platformMatch;
+              }
+              if (!fieldKey) fieldKey = candidates[0];
+            }
+          }
+          // 3) Field key contains CSV header (e.g. key "metafrequency" contains "frequency")
+          if (!fieldKey) {
+            for (const entry of labelEntries) {
+              if (entry.key.toLowerCase().includes(normalizedHeader)) {
+                fieldKey = entry.key;
                 break;
               }
             }
